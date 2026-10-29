@@ -17,7 +17,6 @@ Tiempo aproximado: 30 minutos, más lo que tarde el DBA en crear el login (paso 
 |---|---|---|
 | Un servidor Debian 12 o 13 (2 vCPU, 4 GB de RAM, 10 GB de disco) con salida a internet | Donde va Sofibot | Sistemas |
 | Un usuario con permiso de administrador (`sudo`) y acceso por SSH | Instalar | Sistemas |
-| Acceso al repositorio de GitHub de Sofibot | Descargar el código | Datasofi (ver paso 4) |
 | Nombre del SQL Server, puerto, base de datos y esquema Gold | Conectar | DBA |
 | El login de solo lectura creado con `sql/crear-login-lectura.sql` | Conectar | DBA (paso 6) |
 | Que el servidor de Sofibot llegue al SQL Server por red | Conectar | Sistemas / redes |
@@ -101,55 +100,23 @@ docker compose version
 
 ## Paso 4 · Descargar Sofibot
 
-El repositorio es privado. La forma recomendada para un servidor es una **clave de
-despliegue**: una clave que solo sirve para leer este repositorio desde este servidor.
-
-**4.1 · Crear la clave en el servidor:**
-
-```bash
-ssh-keygen -t ed25519 -C "sofibot-servidor" -f ~/.ssh/sofibot_deploy -N ""
-cat ~/.ssh/sofibot_deploy.pub
-```
-
-Copia la línea que empieza por `ssh-ed25519` y **envíasela a Datasofi**. Es la parte pública:
-se puede enviar por correo sin problema. **Nunca envíes el fichero sin `.pub`.**
-
-Datasofi la añade al repositorio como clave de solo lectura y te avisa.
-
-**4.2 · Configurar SSH para usar esa clave con GitHub** (un único bloque):
-
-```bash
-cat >> ~/.ssh/config <<'EOF'
-Host github.com
-    IdentityFile ~/.ssh/sofibot_deploy
-    IdentitiesOnly yes
-EOF
-chmod 600 ~/.ssh/config
-```
-
-**4.3 · Descargar el código en `/opt/sofibot`:**
+Descarga el código en `/opt/sofibot`:
 
 ```bash
 sudo mkdir -p /opt/sofibot
 sudo chown $USER:$USER /opt/sofibot
-git clone git@github.com:gabrieldatasofi/sofibot-eqz.git /opt/sofibot
+git clone https://github.com/gabrieldatasofi/sofibot-eqz.git /opt/sofibot
 cd /opt/sofibot
 ls
 ```
 
-La primera vez pregunta `Are you sure you want to continue connecting (yes/no)?`: escribe
-`yes` y pulsa Intro.
-
 ✅ **Bien si** `ls` muestra `README.md`, `compose.yaml`, `docs`, `sql`, `src`…
 
-❌ **Si no**: `Permission denied (publickey)` → Datasofi aún no ha añadido la clave, o la
-línea copiada estaba incompleta. Comprueba con `ssh -T git@github.com`: debe responder
-`Hi gabrieldatasofi/sofibot-eqz! You've successfully authenticated`.
-
-> Alternativa sin clave: si Datasofi te ha invitado al repositorio con tu cuenta de GitHub,
-> puedes clonar por HTTPS (`git clone https://github.com/gabrieldatasofi/sofibot-eqz.git /opt/sofibot`)
-> usando como contraseña un *personal access token* de tu cuenta (GitHub → Settings →
-> Developer settings → Personal access tokens), no tu contraseña de GitHub.
+❌ **Si no**:
+- `Could not resolve host: github.com` o `timed out` → el servidor no sale a internet, o
+  sale por un proxy de la empresa; pregunta a sistemas.
+- `destination path '/opt/sofibot' already exists and is not an empty directory` → ya lo
+  habías descargado: entra con `cd /opt/sofibot` y sigue.
 
 ---
 
