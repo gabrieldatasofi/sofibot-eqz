@@ -18,9 +18,13 @@ y se regeneran automáticamente cada día.
 
 ## Puesta en marcha en 5 pasos
 
+> **¿Queréis probarlo en un PC con Windows?** Seguid
+> [00 · Probar en Windows](docs/00-prueba-en-windows.md): de instalar Docker Desktop a ver
+> el primer informe, comando a comando.
+
 | Paso | Qué hacer | Detalle |
 |---|---|---|
-| 1 | Instalar Docker y descargar Sofibot en el servidor | [00 · Instalación paso a paso en Debian](docs/00-instalacion-debian-paso-a-paso.md) (recomendado) o [01 · Instalación](docs/01-instalacion.md) |
+| 1 | Instalar Docker y descargar Sofibot | PC con Windows: [00 · Probar en Windows](docs/00-prueba-en-windows.md). Servidor: [00 · Instalación en Debian](docs/00-instalacion-debian-paso-a-paso.md) o [01 · Instalación](docs/01-instalacion.md) |
 | 2 | Crear el login de solo lectura en SQL Server con `sql/crear-login-lectura.sql` | [02 · Conexión](docs/02-conexion-sql-server.md) |
 | 3 | Copiar `.env.example` a `.env` y rellenar servidor, base de datos y login | [Configuración](docs/configuracion.md) |
 | 4 | Comprobar la conexión y obtener el esquema | `docker compose run --rm sofibot sofibot check` y `... sofibot schema` |
@@ -45,7 +49,8 @@ docker compose up -d                                   # portal: http://localhos
 
 | Documento | Para quién | Contenido |
 |---|---|---|
-| [00 · Instalación paso a paso en Debian](docs/00-instalacion-debian-paso-a-paso.md) | Sistemas | **Empezad aquí**: de un Debian vacío a Sofibot funcionando, comando a comando |
+| [00 · Probar en Windows](docs/00-prueba-en-windows.md) | Quien prueba | **Empezad aquí para probar**: Docker Desktop en un PC con Windows, comando a comando |
+| [00 · Instalación paso a paso en Debian](docs/00-instalacion-debian-paso-a-paso.md) | Sistemas | Para el uso diario: de un servidor Debian vacío a Sofibot funcionando, comando a comando |
 | [01 · Instalación](docs/01-instalacion.md) | Sistemas | Referencia: requisitos, carpetas, versiones, actualización, instalación sin internet |
 | [02 · Conexión a SQL Server](docs/02-conexion-sql-server.md) | DBA / Sistemas | Login de solo lectura, red, cifrado, comprobación |
 | [03 · Tablas Gold](docs/03-tablas-gold.md) | Equipo de datos | Qué tablas espera Sofibot, cómo documentarlas, el contrato de esquema |
