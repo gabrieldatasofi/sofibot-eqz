@@ -36,6 +36,11 @@ docker compose run --rm sofibot sofibot build --all
 docker compose up -d                                   # portal: http://localhost:8080
 ```
 
+- Si el primer `check` falla, el propio mensaje indica qué hacer (certificado, contraseña,
+  red…). Más casos en [Solución de problemas](docs/solucion-de-problemas.md).
+- Si `docker compose up` responde *port is already allocated*, otro programa usa el puerto
+  8080: poned otro en `SOFIBOT_PORT` dentro de `.env` (por ejemplo `8085`).
+
 ## Documentación
 
 | Documento | Para quién | Contenido |
@@ -55,6 +60,7 @@ docker compose up -d                                   # portal: http://localhos
 | Ruta | Qué es |
 |---|---|
 | `compose.yaml`, `Dockerfile` | Contenedor Docker de Sofibot |
+| `requirements.txt` | Versiones exactas de todas las dependencias de Python |
 | `.env.example` | Plantilla de configuración (copiar a `.env`) |
 | `sql/crear-login-lectura.sql` | Script para el DBA: login con SELECT solo sobre el esquema Gold |
 | `reports/` | **Vuestros proyectos de informe** (uno por carpeta) y `gold_schema.json` |

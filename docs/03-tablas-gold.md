@@ -31,6 +31,8 @@ EXEC sp_addextendedproperty N'MS_Description', N'Venta neta sin IVA, en euros.',
 ```
 
 Para cambiar una descripción existente se usa `sp_updateextendedproperty` con los mismos argumentos.
+Si se ejecutan desde un fichero con `sqlcmd`, añadir `-f 65001`: sin él, los acentos de las
+descripciones se guardan mal ("dÃ­a" en vez de "día").
 
 Conviene documentar en especial:
 

@@ -91,6 +91,28 @@ docker compose exec sofibot sofibot <comando>          # dentro del portal ya ar
 2. `docker compose build && docker compose up -d`.
 3. `docker compose exec sofibot sofibot build --all` para regenerar los informes.
 
+## Versiones de las dependencias
+
+Todas las versiones están fijadas, así que construir la imagen hoy o dentro de un año da el
+mismo resultado:
+
+| Qué | Dónde se fija | Versión probada |
+|---|---|---|
+| Python | `Dockerfile` (imagen base) | 3.12.16 sobre Debian 12 |
+| ODBC Driver 18 for SQL Server | `Dockerfile` (`MSODBCSQL_VERSION`) | 18.7.1.1 |
+| Paquetes de Python, directos e indirectos | `requirements.txt` | Ver el fichero |
+| Herramientas de test | `requirements-dev.txt` | pytest 9.2.0 |
+
+Los paquetes de sistema de Debian (`unixodbc`, `tzdata`, certificados) no se fijan: así cada
+build incluye los parches de seguridad de Debian 12.
+
+Para actualizar una versión (lo hace Datasofi en cada entrega):
+
+1. Cambiar el rango en `pyproject.toml` si hace falta.
+2. En un entorno limpio con Python 3.12: `pip install .` y `pip freeze --exclude sofibot-eqz`.
+3. Copiar el resultado a `requirements.txt`, reconstruir la imagen (`docker compose build`),
+   pasar los tests y comprobar `sofibot check` y `sofibot build --all`.
+
 ## Instalación sin internet
 
 Si el servidor no tiene salida a internet, Datasofi puede entregar la imagen ya
@@ -116,7 +138,8 @@ Para escribir y probar informes en un equipo Windows sin Docker:
    ```powershell
    python -m venv .venv
    .venv\Scripts\activate
-   pip install -e ".[dev]"
+   pip install -r requirements-dev.txt
+   pip install --no-deps -e .
    sofibot check
    ```
 

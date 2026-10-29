@@ -12,10 +12,18 @@ principio y ejecutarlo:
 
 ```sql
 DECLARE @login    sysname       = N'sofibot_lectura';
-DECLARE @password nvarchar(128) = N'una-contraseña-larga-y-única';
+DECLARE @password nvarchar(128) = N'Una-Contrasena-Larga-2026!';
 DECLARE @database sysname       = N'NombreDelWarehouse';
 DECLARE @schema   sysname       = N'gold';
 ```
+
+- **Contraseña sin acentos ni ñ**: larga, con letras, números y símbolos. Los caracteres no
+  ingleses pueden guardarse de forma distinta según la herramienta y el login fallaría.
+- **Con `sqlcmd`**, añadir `-f 65001` para que lea el fichero como UTF-8:
+
+  ```bash
+  sqlcmd -S servidor-sql -E -f 65001 -i sql/crear-login-lectura.sql
+  ```
 
 El script:
 

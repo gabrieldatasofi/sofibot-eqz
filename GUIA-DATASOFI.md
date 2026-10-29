@@ -105,8 +105,11 @@ Los comandos usan ContosoRetailDW; con V2 cambia el nombre de la base y del fich
 ## 3. Crear la capa Gold de Contoso
 
 ```powershell
-sqlcmd -S localhost -E -C -d ContosoRetailDW -i examples\contoso\01-crear-gold.sql
+sqlcmd -S localhost -E -C -f 65001 -d ContosoRetailDW -i examples\contoso\01-crear-gold.sql
 ```
+
+`-f 65001` hace que `sqlcmd` lea el fichero como UTF-8. Sin él, los acentos de las
+descripciones se guardan mal ("dÃ­a" en vez de "día").
 
 Crea `gold.month_store` (mes × tienda, con nombre y país) y `gold.month_product`
 (mes × producto, con nombre, marca y categoría), con descripciones `MS_Description`.
@@ -131,7 +134,7 @@ DECLARE @database sysname       = N'ContosoRetailDW';
 DECLARE @schema   sysname       = N'gold';
 ```
 
-y ejecútalo: `sqlcmd -S localhost -E -C -i sql\crear-login-lectura.sql`.
+y ejecútalo: `sqlcmd -S localhost -E -C -f 65001 -i sql\crear-login-lectura.sql`.
 
 **No guardes la contraseña en el script** después de ejecutarlo (deja el valor
 `CAMBIAR-...` original): el script se entrega a EQZ.
@@ -185,7 +188,8 @@ O sin Docker, con Python:
 ```powershell
 python -m venv .venv
 .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -r requirements-dev.txt
+pip install --no-deps -e .
 pytest                       # pruebas sin base de datos
 sofibot check
 sofibot schema

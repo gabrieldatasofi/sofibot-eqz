@@ -4,7 +4,6 @@ services:
   sofibot:
     build: .
     image: datasofi/sofibot-eqz:0.1.0
-    container_name: sofibot-eqz
     env_file: .env
     # En Linux, carpetas montadas propiedad de otro usuario: SOFIBOT_UID/SOFIBOT_GID en .env.
     user: "${SOFIBOT_UID:-10001}:${SOFIBOT_GID:-10001}"

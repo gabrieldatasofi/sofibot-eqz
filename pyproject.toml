@@ -7,6 +7,8 @@ name = "sofibot-eqz"
 version = "0.1.0"
 description = "Informes HTML y Excel desde las tablas Gold de SQL Server"
 requires-python = ">=3.12"
+# Rangos compatibles. Las versiones exactas que se instalan (también las indirectas)
+# están en requirements.txt; mantenlos de acuerdo al actualizar.
 dependencies = [
     "fastapi>=0.115,<1",
     "uvicorn[standard]>=0.31,<1",
@@ -17,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8"]  # versiones exactas en requirements-dev.txt
 
 [project.scripts]
 sofibot = "sofibot_eqz.cli:main"

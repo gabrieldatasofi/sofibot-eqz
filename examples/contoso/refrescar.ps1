@@ -17,7 +17,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 Write-Host "1/2 Capa gold en $Server/$Database..."
-sqlcmd -S $Server -E -C -b -d $Database -i (Join-Path $PSScriptRoot '01-crear-gold.sql')
+sqlcmd -S $Server -E -C -b -f 65001 -d $Database -i (Join-Path $PSScriptRoot '01-crear-gold.sql')
 if ($LASTEXITCODE) { throw "Ha fallado la creación de la capa gold (código $LASTEXITCODE)" }
 
 Write-Host "2/2 Regenerando informes en $Portal..."

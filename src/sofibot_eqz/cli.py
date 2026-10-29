@@ -13,12 +13,15 @@ import sys
 
 
 def check(_args) -> int:
-    from .db import Gold
+    from .db import Gold, connection_hint
 
     try:
         info = Gold().server_info()
     except Exception as exc:  # pyodbc errors carry the driver's explanation (login, TLS, network)
         print(f"ERROR: could not connect: {exc}", file=sys.stderr)
+        if hint := connection_hint(exc):
+            print(f"\nQUÉ HACER: {hint}", file=sys.stderr)
+        print("Más ayuda: docs/solucion-de-problemas.md", file=sys.stderr)
         return 1
     print(json.dumps(info, indent=2, ensure_ascii=False))
     problems = []

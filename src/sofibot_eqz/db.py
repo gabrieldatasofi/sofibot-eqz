@@ -88,6 +88,37 @@ class Settings:
         return ";".join(f"{key}={value}" for key, value in parts.items())
 
 
+# Driver messages are cryptic; these point to the fix (docs/solucion-de-problemas.md).
+HINTS = [
+    (("certificate verify failed", "certificate chain was issued", "self-signed certificate", "self signed certificate"),
+     "El certificado TLS del SQL Server no es de confianza (autofirmado o de una CA interna). Solución "
+     "recomendada: instalar en el SQL Server un certificado válido. Solo para pruebas o una red controlada: "
+     "SQLSERVER_TRUST_CERTIFICATE=1 en .env, que desactiva la comprobación del certificado."),
+    (("login failed",),
+     "SQL Server ha rechazado el usuario o la contraseña. Revisa SQLSERVER_USER y SQLSERVER_PASSWORD, que la "
+     "autenticación de SQL Server esté activada y vuelve a ejecutar sql/crear-login-lectura.sql si hace falta. "
+     "Si la contraseña tiene acentos o ñ y el script se ejecutó con sqlcmd sin -f 65001, se guardó otra distinta."),
+    (("cannot open database",),
+     "El login no tiene acceso a esa base de datos o el nombre es incorrecto: revisa SQLSERVER_DATABASE."),
+    (("login timeout expired", "tcp provider", "server was not found", "network-related", "0x2749", "0x274c"),
+     "No se llega al servidor: revisa SQLSERVER_HOST y SQLSERVER_PORT, el firewall o la VPN, y que TCP/IP esté "
+     "habilitado en SQL Server. Prueba el puerto desde este equipo (Test-NetConnection / nc -vz)."),
+    (("can't open lib", "data source name not found"),
+     "No está instalado el ODBC Driver 18 for SQL Server (solo pasa fuera de Docker)."),
+    (("unsupported protocol", "ssl handshake"),
+     "El SQL Server no admite TLS 1.2: necesita una actualización o parche de seguridad."),
+]
+
+
+def connection_hint(error: Exception | str) -> str | None:
+    """A one-line explanation of a connection error, or None if it is not a known one."""
+    message = str(error).casefold()
+    for patterns, hint in HINTS:
+        if any(pattern in message for pattern in patterns):
+            return hint
+    return None
+
+
 class Gold:
     """Short-lived, parameterized, read-only queries over the Gold schema."""
 

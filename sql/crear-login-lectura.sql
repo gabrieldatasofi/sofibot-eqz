@@ -5,9 +5,11 @@
   Concede SELECT únicamente sobre el esquema Gold: Sofibot no puede leer otros esquemas
   ni escribir, borrar o modificar nada.
 
-  1. Cambia los cuatro valores de abajo.
+  1. Cambia los cuatro valores de abajo. Contraseña: larga, con letras, números y
+     símbolos, pero sin acentos ni ñ (evita problemas de codificación).
   2. Ejecuta el script completo. Se puede volver a ejecutar: actualiza la contraseña
-     y vuelve a conceder el permiso.
+     y vuelve a conceder el permiso. Con sqlcmd, usa -f 65001 para leerlo como UTF-8:
+         sqlcmd -S <servidor> -E -f 65001 -i crear-login-lectura.sql
   3. Pon los mismos valores en el fichero .env de Sofibot
      (SQLSERVER_USER, SQLSERVER_PASSWORD, SQLSERVER_DATABASE, SQLSERVER_GOLD_SCHEMA).
 
@@ -17,12 +19,14 @@
       GRANT SELECT ON SCHEMA::[gold] TO [sofibot_lectura];
 */
 DECLARE @login    sysname       = N'sofibot_lectura';
-DECLARE @password nvarchar(128) = N'CAMBIAR-por-una-contraseña-larga';
+DECLARE @password nvarchar(128) = N'CAMBIAR-por-una-contrasena-larga';
 DECLARE @database sysname       = N'CAMBIAR-nombre-de-la-base-del-warehouse';
 DECLARE @schema   sysname       = N'gold';
 
 SET NOCOUNT ON;
 BEGIN TRY
+    IF @password LIKE N'CAMBIAR%' OR @database LIKE N'CAMBIAR%'
+        THROW 50000, 'Cambia @password y @database al principio del script antes de ejecutarlo.', 1;
     IF DB_ID(@database) IS NULL
         THROW 50001, 'La base de datos indicada en @database no existe en este servidor.', 1;
 
@@ -53,6 +57,6 @@ BEGIN TRY
     PRINT N'Listo: ' + @login + N' puede leer ' + @database + N'.' + @schema + N' y nada más.';
 END TRY
 BEGIN CATCH
-    PRINT N'ERROR: no se ha completado. Nada de lo anterior a este error se ha deshecho; corrige y vuelve a ejecutar.';
+    PRINT N'ERROR: el script se ha detenido. Corrige lo que indica el mensaje siguiente y vuelve a ejecutarlo (se puede ejecutar varias veces).';
     THROW;
 END CATCH;

@@ -6,7 +6,8 @@
     - Contoso V2 (SQLBI): tablas Sales, Store, Product (esquema Data o dbo).
 
   Ejecutar conectado a la base Contoso restaurada:
-      sqlcmd -S localhost -E -C -d ContosoRetailDW -i examples\contoso\01-crear-gold.sql
+      sqlcmd -S localhost -E -C -f 65001 -d ContosoRetailDW -i examples\contoso\01-crear-gold.sql
+  (-f 65001: leer el fichero como UTF-8; sin él los acentos se guardan mal)
 
   Crea el esquema `gold` con dos tablas agregadas por mes, documentadas con
   MS_Description para que `sofibot schema` las describa. Se puede volver a ejecutar:

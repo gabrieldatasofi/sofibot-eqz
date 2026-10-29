@@ -1,0 +1,40 @@
+# Versiones exactas de todas las dependencias de Sofibot (directas e indirectas).
+# Es lo que instala la imagen Docker: dos builds con este fichero son idénticos.
+# Probado con Python 3.12.16 y ODBC Driver 18 (msodbcsql18 18.7.1.1).
+#
+# Actualizar (docs/01-instalacion.md, "Versiones de las dependencias"):
+#   1. cambiar los rangos en pyproject.toml si hace falta;
+#   2. pip install . en un entorno limpio con Python 3.12 y pip freeze --exclude sofibot-eqz;
+#   3. pegar aquí el resultado, reconstruir la imagen y pasar los tests.
+
+# Directas (pyproject.toml)
+fastapi==0.162.0
+uvicorn==0.54.0
+python-dotenv==1.2.4
+pyodbc==5.3.0
+xlsxwriter==3.3.1
+pandas==2.3.3
+
+# Indirectas
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.15.1
+click==8.5.0
+h11==0.16.0
+httptools==0.9.0
+idna==3.20
+numpy==2.5.4
+opentelemetry-api==1.45.1
+pydantic==2.14.1
+pydantic_core==2.50.1
+python-dateutil==3.0.0
+pytz==2026.6
+PyYAML==6.0.3
+six==1.17.0
+starlette==1.10.0
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+tzdata==2026.6
+uvloop==0.23.0
+watchfiles==1.3.0
+websockets==17.3

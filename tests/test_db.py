@@ -30,3 +30,13 @@ def test_windows_and_entra_authentication():
     assert "Authentication=ActiveDirectoryServicePrincipal" in entra.connection_string()
     with pytest.raises(RuntimeError):
         Settings.from_environment({**BASE, "SQLSERVER_AUTH": "kerberos"})
+
+
+def test_connection_errors_get_a_hint():
+    from sofibot_eqz.db import connection_hint
+
+    tls = "[08001] SSL Provider: [error:0A000086:SSL routines::certificate verify failed:self-signed certificate]"
+    assert "SQLSERVER_TRUST_CERTIFICATE" in connection_hint(tls)
+    assert "SQLSERVER_PASSWORD" in connection_hint("[28000] Login failed for user 'x'. (18456)")
+    assert "SQLSERVER_HOST" in connection_hint("[HYT00] Login timeout expired (0)")
+    assert connection_hint("something else") is None
