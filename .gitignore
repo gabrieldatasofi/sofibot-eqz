@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv*/
+.pytest_cache/
+.vscode/
+.tmp/
+
+# Credenciales
+.env
+.env.*
+!.env.example
+
+# Informes generados y ficheros de datos: nunca en git.
+output/*
+!output/.gitkeep
+*.xlsx
+*.csv
+*.parquet
+*.bak
+*.tar
