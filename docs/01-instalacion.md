@@ -1,5 +1,8 @@
 # 01 · Instalación
 
+> **¿Servidor Debian recién instalado?** Seguid [00 · Instalación paso a paso en Debian](00-instalacion-debian-paso-a-paso.md):
+> instala Docker y Sofibot comando a comando. Este documento es la referencia completa.
+
 ## Requisitos
 
 | Elemento | Requisito |

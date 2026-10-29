@@ -10,4 +10,4 @@ Datos públicos de ejemplo (ContosoRetailDW de Microsoft o Contoso V2 de SQLBI) 
 | `refrescar.ps1` | Pipeline de prueba: recrea la capa gold y pide al portal que regenere los informes |
 
 Para usarlos, copia las carpetas de `reports/` a la carpeta `reports/` del proyecto y
-ejecuta `sofibot build --all`. El paso a paso completo está en `GUIA-DATASOFI.md`.
+ejecuta `sofibot build --all`. La base Contoso no se incluye: es una base pública de ejemplo de Microsoft que hay que restaurar en un SQL Server de pruebas.

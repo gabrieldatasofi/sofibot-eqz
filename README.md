@@ -20,7 +20,7 @@ y se regeneran automáticamente cada día.
 
 | Paso | Qué hacer | Detalle |
 |---|---|---|
-| 1 | Instalar Docker y copiar esta carpeta al servidor | [01 · Instalación](docs/01-instalacion.md) |
+| 1 | Instalar Docker y descargar Sofibot en el servidor | [00 · Instalación paso a paso en Debian](docs/00-instalacion-debian-paso-a-paso.md) (recomendado) o [01 · Instalación](docs/01-instalacion.md) |
 | 2 | Crear el login de solo lectura en SQL Server con `sql/crear-login-lectura.sql` | [02 · Conexión](docs/02-conexion-sql-server.md) |
 | 3 | Copiar `.env.example` a `.env` y rellenar servidor, base de datos y login | [Configuración](docs/configuracion.md) |
 | 4 | Comprobar la conexión y obtener el esquema | `docker compose run --rm sofibot sofibot check` y `... sofibot schema` |
@@ -45,7 +45,8 @@ docker compose up -d                                   # portal: http://localhos
 
 | Documento | Para quién | Contenido |
 |---|---|---|
-| [01 · Instalación](docs/01-instalacion.md) | Sistemas | Requisitos, Docker, carpetas, actualización |
+| [00 · Instalación paso a paso en Debian](docs/00-instalacion-debian-paso-a-paso.md) | Sistemas | **Empezad aquí**: de un Debian vacío a Sofibot funcionando, comando a comando |
+| [01 · Instalación](docs/01-instalacion.md) | Sistemas | Referencia: requisitos, carpetas, versiones, actualización, instalación sin internet |
 | [02 · Conexión a SQL Server](docs/02-conexion-sql-server.md) | DBA / Sistemas | Login de solo lectura, red, cifrado, comprobación |
 | [03 · Tablas Gold](docs/03-tablas-gold.md) | Equipo de datos | Qué tablas espera Sofibot, cómo documentarlas, el contrato de esquema |
 | [04 · Crear informes](docs/04-crear-informes.md) | Equipo de datos / desarrollo | Proyectos de informe, página web, Excel, ejemplos |
