@@ -46,6 +46,7 @@ docker compose up -d                                   # portal: http://localhos
 | [04 · Crear informes](docs/04-crear-informes.md) | Equipo de datos / desarrollo | Proyectos de informe, página web, Excel, ejemplos |
 | [05 · Operación](docs/05-operacion.md) | Sistemas | Portal, regeneración diaria, API, logs, copias |
 | [06 · Seguridad](docs/06-seguridad.md) | Todos | Qué puede y qué no puede hacer Sofibot |
+| [07 · Informes con IA](docs/07-informes-con-ia.md) | Equipo de datos | Crear informes pidiéndoselos a un asistente de IA, sin que vea los datos |
 | [Configuración](docs/configuracion.md) | Sistemas | Todas las variables de `.env` |
 | [Solución de problemas](docs/solucion-de-problemas.md) | Todos | Errores frecuentes de conexión y de generación |
 

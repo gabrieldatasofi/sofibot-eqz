@@ -173,7 +173,5 @@ docker compose run --rm sofibot sofibot build --all             # todos
 
 ## 9. Crear informes con un asistente de IA
 
-El proyecto incluye instrucciones para asistentes de IA (`AGENTS.md` y la skill
-`.claude/skills/nuevo-informe`). El asistente trabaja **solo con `reports/gold_schema.json`**:
-escribe el `generate.py` a partir de la estructura, sin ver datos, y una persona lo
-construye con `sofibot build` y revisa el resultado. Ver [06 · Seguridad](06-seguridad.md).
+Un asistente de IA puede escribir el `generate.py` por vosotros a partir de
+`reports/gold_schema.json`, sin ver datos. Ver [07 · Informes con IA](07-informes-con-ia.md).

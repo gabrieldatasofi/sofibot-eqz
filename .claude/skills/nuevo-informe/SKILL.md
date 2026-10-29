@@ -46,12 +46,11 @@ report the schema supports.
 ## 3. Create the project
 
 ```bash
-sofibot new <slug> --name "<Título>" --table gold.<main table> --description "<one sentence>"
+docker compose run --rm sofibot sofibot new <slug> --name "<Título>" --table gold.<main table> --description "<one sentence>"
 ```
 
-`<slug>`: lowercase words joined by `-`. If `sofibot` is not installed locally, ask the
-user to run it through Docker (`docker compose run --rm sofibot sofibot new ...`) or create
-the two files by copying `src/sofibot_eqz/template/` by hand.
+`<slug>`: lowercase words joined by `-`. Creating a project reads no data. If `sofibot` is
+installed locally (a Python virtual environment), `sofibot new ...` is equivalent.
 
 ## 4. Write `reports/<slug>/generate.py`
 
@@ -72,7 +71,8 @@ as the model for a complete report. Rules:
   values and `formats` (`eur`, `usd`, `percent`, `integer`, `month`...), a note with definitions.
 - The final `print` only names the report.
 
-Check that the file compiles: `python -m py_compile reports/<slug>/generate.py`.
+Check that the file compiles (reads no data):
+`docker compose run --rm sofibot python -m py_compile reports/<slug>/generate.py`.
 
 ## 5. Hand over
 
