@@ -5,8 +5,6 @@ consultas, KPIs y gráficos del informe (docs/04-crear-informes.md) y constrúye
 `sofibot build __SLUG__`.
 """
 import argparse
-from datetime import date, datetime
-from decimal import Decimal
 from pathlib import Path
 
 from sofibot_eqz import Gold, Report, TableSource, Workbook
@@ -14,17 +12,6 @@ from sofibot_eqz import Gold, Report, TableSource, Workbook
 PROJECT = Path(__file__).resolve().parent
 TABLE = "__TABLE__"
 PREVIEW_ROWS = 1000  # filas en la página HTML; el Excel lleva todas
-
-
-def cell(value) -> str:
-    """Texto para la tabla HTML. El Excel recibe los valores originales."""
-    if value is None:
-        return ""
-    if isinstance(value, (Decimal, float)):
-        return f"{value:,.2f}"
-    if isinstance(value, (date, datetime)):
-        return value.isoformat()
-    return str(value)
 
 
 def generate(output: Path) -> None:
@@ -36,7 +23,8 @@ def generate(output: Path) -> None:
     report = Report.from_manifest(PROJECT, lang="es")
     report.add_kpi("Filas", len(rows), format="integer", detail=TABLE)
     text_columns = [name for index, name in enumerate(columns) if rows and isinstance(rows[0][index], str)][:3]
-    report.add_table(TABLE, columns, [[cell(value) for value in row] for row in rows[:PREVIEW_ROWS]],
+    # Valores reales: la página los formatea y su botón Excel los exporta como números y fechas.
+    report.add_table(TABLE, columns, rows[:PREVIEW_ROWS],
                      source=TableSource(TABLE, TABLE.split(".")[0]), filters=text_columns)
     if len(rows) > PREVIEW_ROWS:
         report.add_note(f"La página muestra las primeras {PREVIEW_ROWS:,} filas; el Excel las incluye todas.")

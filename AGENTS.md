@@ -12,9 +12,21 @@ database). Do not look for workarounds.
 - Never read `.env`, `output/`, `*.xlsx`, `*.csv` or any built report.
 - Never run `sofibot build`, `sofibot check`, `generate.py`, `sqlcmd` or ad-hoc SQL
   against a client database. Never ask for or use client credentials.
-- The only exception is the public Contoso example (examples/contoso) on a Datasofi
-  development machine whose `.env` points at the Contoso database; even there, report
-  only whether a build passed and its structure, not values.
+- The only exception is the public Contoso example on a Datasofi development machine,
+  through its own environment: `docker compose -f examples/contoso/compose.yaml ...`, whose
+  configuration (`examples/contoso/.env`, never read either) only ever points at the
+  Contoso database. Never run these commands with the project's `compose.yaml` or `.env`.
+  Even with Contoso, report only whether a build passed and its structure, not values, and
+  never read `examples/contoso/output/`.
+
+# The product's query agent is not an exception for you
+
+Sofibot may include a query feature where an LLM answers end users with Gold data, within
+each user's permissions. That is product behaviour, approved by the client (which model
+and provider receive the data) and documented in docs/06-seguridad.md. It is not an
+exception to the policy above: while designing, building, testing or debugging that
+feature, you still never see the client's data. Use the Contoso example or synthetic
+data, never the client's database, the query API, its MCP server or its audit table.
 
 # Writing a report
 
@@ -22,6 +34,8 @@ Use the `nuevo-informe` skill (.claude/skills/nuevo-informe/SKILL.md). In short:
 
 - A report is `reports/<slug>/report.json` + `generate.py`. Create it with
   `sofibot new <slug> --name "..." --table gold.<table>` and edit the template.
+- `report.json` "tables" lists every Gold table `generate.py` reads: the build fails on any
+  other, and portal permissions (`reports/permisos.json`) are granted per table.
 - Read only Gold tables listed in `reports/gold_schema.json`, through
   `sofibot_eqz.Gold`: one connection per report, `?` parameters for every variable value.
 - HTML page with `Report` (lang `es`), Excel with `Workbook`. Give `Workbook` real
@@ -33,7 +47,16 @@ Use the `nuevo-informe` skill (.claude/skills/nuevo-informe/SKILL.md). In short:
 
 # Code in this repository
 
-- `src/sofibot_eqz/`: package (db, schema, html, excel, projects, cli, server).
+- `src/sofibot_eqz/`: package (db, schema, html, excel, projects, cli, server; pages: ui,
+  pages, review, admin). Architecture: docs/12-arquitectura.md.
+  Two separate functionalities share only `identity.py` (Entra ID tokens, function roles)
+  and `access.py` (tables per role):
+  - functionality 1, writing reports: `drafts.py`, `review.py`, `report_guide.md` (keep it in
+    sync with docs/04 and the skill), `/api/code`, `mcp-server/sofibot_informes_mcp.py`; docs/10;
+  - functionality 2, data queries: `consultas/` (its own app, container and settings),
+    `mcp-server/sofibot_consultas_mcp.py`; the portal's /consultas page only forwards the
+    user's own token to it; docs/11.
+  Never add a data path from one to the other.
 - Docs for the client in `docs/` (Spanish). Keep them in sync with behaviour changes.
 - Tests: `pytest` (no database needed).
 - Datasofi visual style: blue #2C3968, orange #D16B1B, cyan #279CDB, teal #5DAEAB, Roboto.

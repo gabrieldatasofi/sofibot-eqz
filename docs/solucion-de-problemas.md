@@ -40,7 +40,8 @@ firewall de Windows permite conexiones al puerto 1433 desde la red de Docker.
 | Síntoma | Solución |
 |---|---|
 | `docker compose ps` muestra el contenedor en `Created` y el portal no responde, o `port is already allocated` | Otro programa usa el puerto 8080: cambiar `SOFIBOT_PORT` en `.env` (por ejemplo `8085`) y `docker compose up -d` |
-| No abre desde otro equipo | Por defecto solo escucha en `127.0.0.1`: ver "Acceso desde la red" en [05 · Operación](05-operacion.md) |
+| No abre desde otro equipo | Por defecto solo escucha en `127.0.0.1`: ver [08 · Acceso desde la red con HTTPS](08-acceso-https.md) |
+| Aviso de certificado, `502` o el proxy no arranca | Ver "Problemas frecuentes" en [08 · Acceso desde la red con HTTPS](08-acceso-https.md) |
 | `docker compose ps` no muestra `healthy` | `docker compose logs sofibot` |
 | Un informe no se actualiza a la hora programada | Revisar `SOFIBOT_BUILD_SCHEDULE` y `TZ`, y los logs a esa hora |
 | La API responde 503 `SOFIBOT_ADMIN_TOKEN is not configured` | Definir el token (32+ caracteres) y `docker compose up -d` |

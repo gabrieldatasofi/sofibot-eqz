@@ -11,4 +11,10 @@ load_dotenv(HOME / ".env", override=False)
 REPORTS_DIR = Path(os.environ.get("SOFIBOT_REPORTS_DIR", HOME / "reports")).resolve()
 OUTPUT_DIR = Path(os.environ.get("SOFIBOT_OUTPUT_DIR", HOME / "output")).resolve()
 SCHEMA_FILE = REPORTS_DIR / "gold_schema.json"
+# Shipped in the image next to the code: the technical documentation shown to administrators
+# and the MCP servers users download (in a checkout, the repository's own folders).
+DOCS_DIR = Path(os.environ.get("SOFIBOT_DOCS_DIR", HOME / "docs")).resolve()
+MCP_DIR = Path(os.environ.get("SOFIBOT_MCP_DIR", HOME / "mcp-server")).resolve()
+# Report code written through the API (drafts.py) until a person publishes it into reports/.
+DRAFTS_DIR = Path(os.environ.get("SOFIBOT_DRAFTS_DIR", REPORTS_DIR / ".borradores")).resolve()
 BUILD_TIMEOUT = int(os.environ.get("SOFIBOT_BUILD_TIMEOUT", "900"))

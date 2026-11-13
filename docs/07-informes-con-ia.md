@@ -24,6 +24,10 @@ Si vuestra política lo permite, podéis decidir otra cosa, pero tened en cuenta
 que el asistente lee (resultados de consultas, informes, Excel, errores con valores) sale
 hacia el servicio de IA.
 
+Este documento describe el asistente trabajando en la carpeta del proyecto. Si el
+asistente está en otro equipo y no tiene acceso a la carpeta, puede hacer lo mismo a
+través de la API de informes y su servidor MCP: ver [10 · API de esquema e informes](10-api-informes.md).
+
 ## Requisitos
 
 | Elemento | Detalle |
@@ -98,41 +102,21 @@ Server, su número y mensaje (por ejemplo `Invalid column name 'tienda' (207)`).
 
 Más errores: [Solución de problemas](solucion-de-problemas.md).
 
-## Reglas de seguridad recomendadas para Claude Code
+## Reglas de seguridad para Claude Code
 
-Además de las instrucciones de `AGENTS.md`, Claude Code permite **bloquear técnicamente**
-acciones. Recomendamos crear `.claude/settings.json` con este contenido, que impide al
-asistente leer la configuración y los informes generados y lanzar builds contra los datos:
+Además de las instrucciones de `AGENTS.md`, el proyecto incluye `.claude/settings.json`,
+que **bloquea técnicamente** en Claude Code lo que el asistente no debe hacer:
 
-```json
-{
-  "permissions": {
-    "allow": [
-      "Read(reports/gold_schema.json)",
-      "Edit(reports/**/generate.py)",
-      "Edit(reports/**/report.json)",
-      "Bash(docker compose run --rm sofibot sofibot new:*)",
-      "Bash(docker compose run --rm sofibot sofibot list)",
-      "Bash(docker compose run --rm sofibot python -m py_compile:*)"
-    ],
-    "deny": [
-      "Read(.env)",
-      "Read(.env.*)",
-      "Read(output/**)",
-      "Read(**/*.xlsx)",
-      "Read(**/*.csv)",
-      "Bash(sofibot build:*)",
-      "Bash(docker compose run --rm sofibot sofibot build:*)",
-      "Bash(docker compose run sofibot sofibot build:*)",
-      "Bash(docker compose exec:*)",
-      "Bash(docker exec:*)",
-      "Bash(docker cp:*)",
-      "Bash(sqlcmd:*)"
-    ]
-  }
-}
-```
+- leer la configuración (`.env`), los informes generados (`output/`) y ficheros de datos
+  (`.xlsx`, `.csv`, `.parquet`, `.bak`);
+- generar o comprobar informes contra la base (`sofibot build`, `sofibot check`, ejecutar
+  un `generate.py`), entrar en el contenedor (`docker compose exec`, `docker cp`) o lanzar
+  `sqlcmd`.
 
-Con estas reglas, el asistente puede crear y editar informes, pero si intenta generar uno o
-leer resultados, Claude Code lo bloquea y os lo indica. Para otros asistentes, consultad su
-documentación sobre permisos; `AGENTS.md` sigue aplicando.
+Sí le deja crear informes (`sofibot new`), editar `generate.py` y `report.json` y comprobar
+que compilan. Si intenta algo bloqueado, Claude Code lo impide y os lo indica.
+
+No quitéis reglas de `deny`. Para permisos propios de cada persona, usad
+`.claude/settings.local.json` (no se sube a git). Estas reglas son una red de seguridad,
+no una garantía completa: `AGENTS.md` sigue aplicando, y para otros asistentes consultad
+su documentación sobre permisos.

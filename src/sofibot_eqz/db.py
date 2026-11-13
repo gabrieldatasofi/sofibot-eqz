@@ -7,6 +7,7 @@ module, is what makes the access read-only.
 from contextlib import contextmanager
 from dataclasses import dataclass
 import os
+import re
 from typing import Any, Iterator, Sequence
 
 import pyodbc
@@ -119,11 +120,58 @@ def connection_hint(error: Exception | str) -> str | None:
     return None
 
 
+# Report builds pass the tables declared in report.json (projects.build); queries may only read those.
+DECLARED_TABLES_VARIABLE = "SOFIBOT_REPORT_TABLES"
+_COMMENTS = re.compile(r"--[^\n]*|/\*.*?\*/", re.DOTALL)
+_IDENTIFIER = r'(?:\[(?:[^\]]|\]\])+\]|"(?:[^"]|"")+"|[A-Za-z_@#][\w@$#]*)'
+_DOTTED = re.compile(rf"{_IDENTIFIER}(?:\s*\.\s*{_IDENTIFIER})+")
+_PART = re.compile(_IDENTIFIER)
+
+
+def _unquote(identifier: str) -> str:
+    if identifier[0] == "[":
+        return identifier[1:-1].replace("]]", "]")
+    if identifier[0] == '"':
+        return identifier[1:-1].replace('""', '"')
+    return identifier
+
+
+def referenced_tables(sql: str, schema: str = "gold") -> set[str]:
+    """'schema.table' names of the Gold schema that a statement mentions, lower case.
+
+    Recognises gold.t, [gold].[t], "gold"."t" and db.gold.t. It is a check against mistakes
+    (a report reading a table it does not declare), not a SQL parser: an alias called like the
+    schema reads as a table and makes the check stricter, never looser.
+    """
+    schema = schema.casefold()
+    found = set()
+    for chain in _DOTTED.finditer(_COMMENTS.sub(" ", sql)):
+        parts = [_unquote(part).casefold() for part in _PART.findall(chain.group(0))]
+        found.update(f"{schema}.{table}" for owner, table in zip(parts, parts[1:]) if owner == schema)
+    return found
+
+
+class UndeclaredTableError(Exception):
+    pass
+
+
 class Gold:
     """Short-lived, parameterized, read-only queries over the Gold schema."""
 
     def __init__(self, settings: Settings | None = None):
         self.settings = settings or Settings.from_environment()
+
+    def check_declared(self, sql: str) -> None:
+        """During a report build, refuse queries over Gold tables missing from report.json 'tables'."""
+        declared = os.environ.get(DECLARED_TABLES_VARIABLE)
+        if declared is None:
+            return
+        allowed = {name.strip().casefold() for name in declared.split(",") if name.strip()}
+        undeclared = sorted(referenced_tables(sql, self.settings.schema) - allowed)
+        if undeclared:
+            raise UndeclaredTableError(
+                f"The query reads {', '.join(undeclared)}, which report.json does not list in 'tables'. "
+                "Add it there: the portal decides who sees the report from those tables.")
 
     @contextmanager
     def connect(self) -> Iterator[pyodbc.Connection]:
@@ -138,6 +186,7 @@ class Gold:
 
     def query(self, sql: str, parameters: Sequence[Any] = (), *, connection: pyodbc.Connection | None = None):
         """Run one statement with `?` placeholders; returns (column names, rows as tuples)."""
+        self.check_declared(sql)
         if connection is None:
             with self.connect() as connection:
                 return self.query(sql, parameters, connection=connection)

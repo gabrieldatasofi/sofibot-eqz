@@ -30,9 +30,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY pyproject.toml ./
 COPY src ./src
 RUN pip install --no-cache-dir --no-deps . && pip check && rm -rf src
+# Documentación técnica (página de administración) y conectores MCP que se descargan desde el portal.
+COPY docs ./docs
+COPY mcp-server ./mcp-server
 
-# reports/: proyectos de informe (código). output/: informes generados. Ambos se montan como volúmenes.
-RUN mkdir -p /app/reports /app/output && chown sofibot:sofibot /app/reports /app/output
+# reports/: proyectos de informe (código). output/: informes generados. consultas/: registro del
+# servicio de consultas (docs/11-consultas.md). Se montan como volúmenes.
+RUN mkdir -p /app/reports /app/output /app/consultas && chown sofibot:sofibot /app/reports /app/output /app/consultas
 USER sofibot
 EXPOSE 8080
 

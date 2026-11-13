@@ -40,3 +40,32 @@ def test_connection_errors_get_a_hint():
     assert "SQLSERVER_PASSWORD" in connection_hint("[28000] Login failed for user 'x'. (18456)")
     assert "SQLSERVER_HOST" in connection_hint("[HYT00] Login timeout expired (0)")
     assert connection_hint("something else") is None
+
+
+# --- Gold tables a query reads (report.json "tables") -----------------------------------
+
+@pytest.mark.parametrize("sql, expected", [
+    ("SELECT a FROM gold.month_store WHERE b = ?", {"gold.month_store"}),
+    ("SELECT * FROM [gold].[Month Store] s JOIN \"GOLD\".\"x\" ON 1=1", {"gold.month store", "gold.x"}),
+    ("SELECT * FROM ContosoDW.gold.month_product", {"gold.month_product"}),
+    ("SELECT * FROM gold . month_store /* gold.oculta */ -- gold.otra", {"gold.month_store"}),
+    ("SELECT s.month FROM gold.month_store AS s", {"gold.month_store"}),
+    ("SELECT name FROM INFORMATION_SCHEMA.TABLES", set()),
+])
+def test_referenced_tables(sql, expected):
+    from sofibot_eqz.db import referenced_tables
+
+    assert referenced_tables(sql) == expected
+
+
+def test_builds_only_query_declared_tables(monkeypatch):
+    from sofibot_eqz.db import Gold, UndeclaredTableError
+
+    gold = Gold(Settings(host="h", database="d", user="u", password="p"))
+    gold.check_declared("SELECT * FROM gold.otra")  # outside a build: no check
+    monkeypatch.setenv("SOFIBOT_REPORT_TABLES", "gold.month_store")
+    gold.check_declared("SELECT * FROM [gold].[MONTH_STORE]")
+    with pytest.raises(UndeclaredTableError, match="gold.month_product"):
+        gold.check_declared("SELECT * FROM gold.month_store s JOIN gold.month_product p ON 1 = 1")
+    with pytest.raises(UndeclaredTableError):  # refused before connecting to anything
+        gold.query("SELECT * FROM gold.month_product")

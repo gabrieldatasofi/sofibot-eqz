@@ -1,0 +1,64 @@
+# Entorno de pruebas de Datasofi con la base pública Contoso. No es parte de la instalación
+# del cliente: usa su propia configuración, informes y salida, separados del proyecto.
+#
+#   docker compose -f examples/contoso/compose.yaml up -d --build      -> http://localhost:8085
+#   docker compose -f examples/contoso/compose.yaml run --rm sofibot sofibot build --all
+#
+# Configuración: examples/contoso/.env (copiar de examples/contoso/.env.example). Solo debe
+# apuntar a la base Contoso, nunca a datos de un cliente.
+name: sofibot-contoso
+services:
+  sofibot:
+    build: ../..
+    image: datasofi/sofibot-eqz:dev
+    env_file: .env
+    user: "${SOFIBOT_UID:-10001}:${SOFIBOT_GID:-10001}"
+    ports:
+      - "127.0.0.1:${SOFIBOT_PORT:-8085}:8080"
+    volumes:
+      - ./reports:/app/reports
+      - ./output:/app/output
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Funcionalidad 2, consultas de datos (docs/11-consultas.md), sobre Contoso. Se activa con
+  # COMPOSE_PROFILES=consultas en examples/contoso/.env, que necesita también ENTRA_TENANT_ID y
+  # ENTRA_CLIENT_ID. Usa la misma configuración que el portal de pruebas porque solo apunta a Contoso.
+  consultas:
+    build: ../..
+    image: datasofi/sofibot-eqz:dev
+    profiles: ["consultas"]
+    command: ["sofibot", "serve-consultas", "--host", "0.0.0.0", "--port", "8080"]
+    env_file: .env
+    environment:
+      SOFIBOT_QUERY_ENABLED: "1"
+    user: "${SOFIBOT_UID:-10001}:${SOFIBOT_GID:-10001}"
+    ports:
+      - "127.0.0.1:${SOFIBOT_QUERY_PORT:-8086}:8080"
+    volumes:
+      - ./reports:/app/reports:ro
+      - ./consultas:/app/consultas
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Proxy HTTPS para probar desde otro equipo de la red (README, "Probar desde otro equipo").
+  # Se activa con COMPOSE_PROFILES=https en examples/contoso/.env. Mismo Caddyfile que el cliente.
+  proxy:
+    image: caddy:2.8.4-alpine
+    profiles: ["https"]
+    depends_on:
+      - sofibot
+    environment:
+      SOFIBOT_DOMAIN: ${SOFIBOT_DOMAIN:-}
+      SOFIBOT_TLS: ${SOFIBOT_TLS:-internal}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  caddy-data:
+  caddy-config:

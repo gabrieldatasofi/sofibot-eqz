@@ -1,0 +1,41 @@
+{
+  "tables": {
+    "gold.month_store": {
+      "description": "Ventas de Contoso por mes y tienda, en USD.",
+      "period": "month",
+      "dimensions": {
+        "mes": {"column": "month", "description": "Mes natural (primer día del mes)"},
+        "tienda": {"column": "store_name", "description": "Nombre de la tienda", "synonyms": ["local", "punto de venta"]},
+        "pais": {"column": "country", "description": "País de la tienda"}
+      },
+      "measures": {
+        "ventas": {"sum": "sales_usd", "format": "usd", "description": "Venta neta en USD", "synonyms": ["facturación", "ingresos"]},
+        "coste": {"sum": "cost_usd", "format": "usd", "description": "Coste en USD"},
+        "margen": {"sum": "gross_profit_usd", "format": "usd", "description": "Margen bruto en USD"},
+        "margen_pct": {"ratio": ["gross_profit_usd", "sales_usd"], "format": "percent", "description": "Margen bruto sobre venta neta"},
+        "unidades": {"sum": "quantity", "format": "integer", "description": "Unidades vendidas"},
+        "tiendas": {"distinct": "store_name", "format": "integer", "description": "Número de tiendas con ventas"}
+      },
+      "rules": ["Describe las mismas ventas que gold.month_product: no sumar una tabla con la otra."]
+    },
+    "gold.month_product": {
+      "description": "Ventas de Contoso por mes y producto, en USD.",
+      "period": "month",
+      "dimensions": {
+        "mes": {"column": "month", "description": "Mes natural (primer día del mes)"},
+        "producto": {"column": "product_name", "description": "Nombre del producto"},
+        "marca": {"column": "brand", "description": "Marca"},
+        "categoria": {"column": "category", "description": "Categoría", "synonyms": ["familia"]},
+        "subcategoria": {"column": "subcategory", "description": "Subcategoría"}
+      },
+      "measures": {
+        "ventas": {"sum": "sales_usd", "format": "usd", "description": "Venta neta en USD", "synonyms": ["facturación", "ingresos"]},
+        "margen": {"sum": "gross_profit_usd", "format": "usd", "description": "Margen bruto en USD"},
+        "margen_pct": {"ratio": ["gross_profit_usd", "sales_usd"], "format": "percent", "description": "Margen bruto sobre venta neta"},
+        "unidades": {"sum": "quantity", "format": "integer", "description": "Unidades vendidas"},
+        "productos": {"distinct": "product_name", "format": "integer", "description": "Número de productos con ventas"}
+      },
+      "rules": ["Describe las mismas ventas que gold.month_store: no sumar una tabla con la otra."]
+    }
+  }
+}

@@ -17,6 +17,25 @@ No hace falta instalar Python, el driver ODBC ni ninguna herramienta de SQL Serv
 servidor: todo va dentro de la imagen Docker. El driver incluido es **ODBC Driver 18 for
 SQL Server**.
 
+## Dos formas de instalar
+
+Sofibot se puede instalar de dos maneras, según quién lo instale:
+
+| | Desarrollo (Datasofi) | Cliente (en preparación) |
+|---|---|---|
+| Para | Quien desarrolla o adapta Sofibot | Quien solo lo usa y lo administra |
+| Cómo | `git clone` + `docker compose build` | `docker compose pull` de una imagen publicada por Datasofi |
+| Código en el servidor | Sí: `src/` se puede modificar y la imagen se construye en el servidor | No: el código va dentro de la imagen y no se puede cambiar |
+| Qué se configura | Todo | Solo `.env`, `.env.consultas` y `reports/` (informes, catálogo, permisos) |
+| Actualizar | `git pull` + `docker compose build` + `up -d` | Cambiar la versión de la imagen + `docker compose pull` + `up -d` |
+| Conectores de Claude y Codex | Hay que generar `mcp-server/dist/sofibot-mcp.exe` con `build-exe.ps1` antes de construir | Vienen dentro de la imagen |
+
+Hoy está disponible la forma de desarrollo, que es la que describen este documento y la guía
+de Debian. La forma de cliente está prevista: Datasofi publicará cada versión como imagen
+en un registro, fijada por su huella (`@sha256:…`) y firmada, con un `compose.yaml` que la
+descarga en lugar de construirla, un contenedor de solo lectura y el `.exe` firmado. Así el
+cliente no tiene código que modificar y cada instalación es idéntica a la que se probó.
+
 ## Instalación
 
 1. Copiar esta carpeta al servidor, por ejemplo en `/opt/sofibot`.
@@ -60,7 +79,7 @@ SQL Server**.
    ```
 
    El portal queda en `http://localhost:8080`. Para abrirlo desde otros equipos, ver
-   "Acceso desde la red" en [05 · Operación](05-operacion.md).
+   [08 · Acceso desde la red con HTTPS](08-acceso-https.md).
 
 ## Cómo se ejecutan los comandos
 

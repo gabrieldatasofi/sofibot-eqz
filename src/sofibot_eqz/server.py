@@ -1,30 +1,38 @@
-"""Web portal: lists the built reports, serves them and rebuilds them on request or on a schedule.
+"""Web portal: the pages for people (pages.py, review.py, admin.py), the built reports, the
+report-code API of functionality 1 and the administration API; rebuilds reports on request or
+on a schedule. Functionality 2 (queries) is a separate service: consultas/server.py.
 
-Viewers: open, or HTTP Basic sign-in when SOFIBOT_VIEWER_PASSWORD is set.
+Viewers (SOFIBOT_AUTH, auth.py): open, one shared HTTP Basic password, or each person with
+Microsoft Entra ID, who then sees only the reports their roles allow (access.py).
 Administration (/api/admin/...): Bearer SOFIBOT_ADMIN_TOKEN.
+Report code (/api/code/...): the author's Entra ID token (SOFIBOT_CODE_API, drafts.api_mode).
+Schema contract and report drafts for AI assistants (drafts.py): never data, and nothing it
+writes is built until a reviewer publishes it.
 """
 import base64
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
-from html import escape
 import logging
 import mimetypes
 import os
 import secrets
 import threading
 import time
+from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
+from starlette.middleware.sessions import SessionMiddleware
 
-from . import __version__, config, projects
+from . import __version__, access, admin, auth, config, drafts, identity, pages, projects, review
 from .db import Gold
+from .identity import ROLE_AUTHOR, Identity
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("sofibot")
-build_lock = threading.Lock()
+build_lock = projects.BUILD_LOCK
 config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # The slim image has no system MIME table: without this, Excel files are served as octet-stream.
 mimetypes.add_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx")
@@ -67,6 +75,13 @@ def scheduler(times: list[tuple[int, int]]) -> None:
 
 @asynccontextmanager
 async def lifespan(_app):
+    sign_in = auth.check_settings()
+    log.info("Portal sign-in: %s", sign_in)
+    if sign_in == "entra":
+        try:
+            access.read()
+        except access.PermissionsError as exc:
+            log.warning("Permissions: %s. Signed-in users see no reports until it is fixed.", exc)
     times = schedule_times()
     if times:
         threading.Thread(target=scheduler, args=(times,), daemon=True, name="build-schedule").start()
@@ -80,18 +95,37 @@ app = FastAPI(title="Sofibot Equivalenza", version=__version__, lifespan=lifespa
 
 @app.middleware("http")
 async def viewer_sign_in(request: Request, call_next):
-    password = os.environ.get("SOFIBOT_VIEWER_PASSWORD", "")
     path = request.url.path
-    if password and path != "/health" and not path.startswith("/api/admin/"):
-        expected = f"{os.environ.get('SOFIBOT_VIEWER_USER', 'equivalenza')}:{password}".encode()
+    if path == "/health" or path.startswith(("/api/admin/", "/api/code/")):  # these APIs have their own tokens
+        return await call_next(request)
+    if path in ("/", "/conexion.json") and auth.mode() == "entra":  # landing page; ids for the connector installer
+        return await call_next(request)
+    sign_in = auth.mode()
+    if sign_in == "basic":
+        expected = f"{os.environ.get('SOFIBOT_VIEWER_USER', 'equivalenza')}:{os.environ.get('SOFIBOT_VIEWER_PASSWORD', '')}"
         supplied = request.headers.get("authorization", "")
         try:
             supplied = base64.b64decode(supplied[6:]) if supplied.startswith("Basic ") else b""
         except ValueError:
             supplied = b""
-        if not secrets.compare_digest(supplied, expected):
+        if not os.environ.get("SOFIBOT_VIEWER_PASSWORD") or not secrets.compare_digest(supplied, expected.encode()):
             return JSONResponse({"detail": "Sign-in required"}, 401, {"WWW-Authenticate": 'Basic realm="Sofibot"'})
+    elif sign_in == "entra" and not path.startswith("/auth/") and not request.session.get("user"):
+        if path.startswith("/api/"):
+            return JSONResponse({"detail": "Sign-in required"}, 401)
+        target = path + (f"?{request.url.query}" if request.url.query else "")
+        return RedirectResponse(f"/auth/login?next={quote(target)}", 302)
     return await call_next(request)
+
+
+# Added after the middleware above so that it runs first and fills request.session.
+# Signed (not encrypted) cookie: it holds the user's name, e-mail and roles, nothing secret.
+# A new key on every start: after a restart users sign in again, silently with Entra ID.
+app.add_middleware(
+    SessionMiddleware, secret_key=secrets.token_urlsafe(48), session_cookie="sofibot_session",
+    max_age=int(float(os.environ.get("SOFIBOT_SESSION_HOURS", "8")) * 3600), same_site="lax", https_only=True,
+)
+app.include_router(auth.router)
 
 
 def require_admin(request: Request) -> None:
@@ -102,7 +136,167 @@ def require_admin(request: Request) -> None:
         raise HTTPException(401, "Administrator token required")
 
 
-app.mount("/output", StaticFiles(directory=config.OUTPUT_DIR, html=True), name="output")
+def code_caller(request: Request) -> Identity:
+    """Who is calling the report-code API. It writes drafts; it never publishes or builds."""
+    try:
+        mode = drafts.api_mode()
+    except drafts.DraftError as exc:
+        raise HTTPException(exc.status, str(exc)) from exc
+    header = request.headers.get("authorization", "")
+    if mode == "off":
+        raise HTTPException(503, "The report-code API is off (SOFIBOT_CODE_API)")
+    if mode == "token":
+        token = os.environ.get("SOFIBOT_API_TOKEN", "")
+        if len(token) < 32 or token == os.environ.get("SOFIBOT_ADMIN_TOKEN"):
+            raise HTTPException(503, "SOFIBOT_API_TOKEN is not configured (32 characters or more, different from the admin token)")
+        if not secrets.compare_digest(header.encode(), f"Bearer {token}".encode()):
+            raise HTTPException(401, "API token required")
+        return Identity(email="token compartido", via="token")
+    try:
+        caller = identity.from_bearer(header)
+    except identity.IdentityError as exc:
+        raise HTTPException(401, str(exc)) from exc
+    if ROLE_AUTHOR not in caller.roles:
+        raise HTTPException(403, f"Your account does not have the {ROLE_AUTHOR} role")
+    return caller
+
+
+def draft_call(function, *arguments, action: str = "", **keywords):
+    """Run a drafts.py function; refused requests become HTTP errors with a safe message."""
+    try:
+        result = function(*arguments, **keywords)
+    except drafts.DraftError as exc:
+        raise HTTPException(exc.status, str(exc)) from exc
+    if action:
+        log.info("Report code API: %s %s by %s", action, arguments[0] if arguments else keywords.get("slug", ""),
+                 keywords.get("actor") or "?")
+    return result
+
+
+class NewDraft(BaseModel):
+    slug: str
+    name: str = ""
+    table: str = ""
+    description: str = ""
+    from_report: bool = False
+
+
+class FileContent(BaseModel):
+    content: str
+
+
+class Rejection(BaseModel):
+    comment: str = ""
+
+
+code = APIRouter(prefix="/api/code")
+
+
+def caller_tables(caller: Identity) -> set[str] | None:
+    return caller.tables(access.load())
+
+
+@code.get("/schema")
+def code_schema(caller: Identity = Depends(code_caller)):
+    """Gold schema contract (the caller's tables) and report guide. Never opens the database."""
+    return draft_call(drafts.describe_schema, caller_tables(caller))
+
+
+@code.get("/reports")
+def code_reports(caller: Identity = Depends(code_caller)):
+    return {"reports": drafts.list_reports(caller_tables(caller))}
+
+
+@code.get("/drafts")
+def code_drafts(caller: Identity = Depends(code_caller)):
+    return {"drafts": drafts.list_drafts(caller_tables(caller))}
+
+
+@code.post("/drafts", status_code=201)
+def code_create(body: NewDraft, caller: Identity = Depends(code_caller)):
+    return draft_call(drafts.create_draft, body.slug, body.name, body.table, body.description,
+                      from_report=body.from_report, actor=caller.email, tables=caller_tables(caller), action="create")
+
+
+@code.get("/drafts/{slug}")
+def code_status(slug: str, caller: Identity = Depends(code_caller)):
+    return draft_call(drafts.draft_status, slug, caller_tables(caller))
+
+
+@code.delete("/drafts/{slug}")
+def code_delete(slug: str, caller: Identity = Depends(code_caller)):
+    return draft_call(drafts.delete_draft, slug, actor=caller.email, tables=caller_tables(caller), action="delete")
+
+
+@code.get("/drafts/{slug}/files/{name}")
+def code_read(slug: str, name: str, caller: Identity = Depends(code_caller)):
+    return draft_call(drafts.read_file, slug, name, caller_tables(caller))
+
+
+@code.put("/drafts/{slug}/files/{name}")
+def code_write(slug: str, name: str, body: FileContent, caller: Identity = Depends(code_caller)):
+    return draft_call(drafts.write_file, slug, name, body.content, actor=caller.email, tables=caller_tables(caller),
+                      action=f"write {name} in")
+
+
+@code.post("/drafts/{slug}/check")
+def code_check(slug: str, caller: Identity = Depends(code_caller)):
+    return draft_call(drafts.check_draft, slug, caller_tables(caller))
+
+
+@code.post("/drafts/{slug}/submit")
+def code_submit(slug: str, caller: Identity = Depends(code_caller)):
+    return draft_call(drafts.submit_draft, slug, actor=caller.email, tables=caller_tables(caller), action="submit")
+
+
+app.include_router(code)
+app.include_router(review.router)
+app.include_router(pages.router)
+app.include_router(admin.router)
+ADMIN = "administrador (token)"
+
+
+@app.get("/api/admin/drafts", dependencies=[Depends(require_admin)])
+def admin_drafts():
+    return {"drafts": drafts.list_drafts()}
+
+
+@app.get("/api/admin/drafts/{slug}/files/{name}", dependencies=[Depends(require_admin)])
+def admin_read(slug: str, name: str):
+    return draft_call(drafts.read_file, slug, name)
+
+
+@app.post("/api/admin/drafts/{slug}/publish", dependencies=[Depends(require_admin)])
+def admin_publish(slug: str):
+    """Copy a submitted draft into reports/. It is built at the next scheduled build or with the build API."""
+    return draft_call(drafts.publish, slug, actor=ADMIN, action="publish")
+
+
+@app.post("/api/admin/drafts/{slug}/reject", dependencies=[Depends(require_admin)])
+def admin_reject(slug: str, body: Rejection):
+    return draft_call(drafts.reject, slug, body.comment, actor=ADMIN, action="reject")
+
+
+@app.api_route("/output/{slug}", methods=["GET", "HEAD"])
+def report_folder(slug: str):
+    return RedirectResponse(f"/output/{quote(slug)}/", 307)
+
+
+@app.api_route("/output/{slug}/{file_path:path}", methods=["GET", "HEAD"])
+def report_file(slug: str, file_path: str, request: Request):
+    if not projects.SLUG.fullmatch(slug):
+        raise HTTPException(404, "Not found")
+    if not access.visible(auth.current_user(request), projects.built_tables(slug)):
+        return auth.page("Sin acceso a este informe", "Tu usuario no tiene permiso para ver este informe. "
+                         "Si lo necesitas, pide acceso a sistemas.", ("/informes", "Ir a mis informes"), status=403)
+    folder = (config.OUTPUT_DIR / slug).resolve()
+    target = (folder / file_path).resolve()
+    if target.is_dir():
+        target = target / "index.html"
+    # resolve() + is_relative_to: '..' in the path cannot reach another report's folder.
+    if not target.is_relative_to(folder) or not target.is_file():
+        raise HTTPException(404, "Not found")
+    return FileResponse(target, headers={"Cache-Control": "private, no-cache"})
 
 
 @app.get("/health")
@@ -110,14 +304,12 @@ def health():
     return {"status": "ok", "version": __version__}
 
 
-@app.get("/")
-def root():
-    return RedirectResponse("/dashboard")
-
-
 @app.get("/api/reports")
-def list_reports():
-    return {"reports": projects.built(), "projects": list(projects.projects())}
+def list_reports(request: Request):
+    reports = pages.visible_reports(request)
+    if auth.current_user(request) is not None:  # per-user sign-in: only what this user can see
+        return {"reports": reports, "projects": [report["slug"] for report in reports]}
+    return {"reports": reports, "projects": list(projects.projects())}
 
 
 @app.get("/api/admin/check", dependencies=[Depends(require_admin)])
@@ -146,29 +338,3 @@ async def build_all():
     if build_lock.locked():
         raise HTTPException(409, "Another build is running")
     return {"results": await run_in_threadpool(build_reports, list(projects.projects()), "api")}
-
-
-@app.get("/dashboard", response_class=HTMLResponse)
-def dashboard():
-    cards = []
-    for report in projects.built():
-        links = [f'<a class="primary" href="{escape(report["html"])}">Ver informe</a>'] if report["html"] else []
-        links += [f'<a href="{escape(url)}" download>Excel · {escape(url.rsplit("/", 1)[-1])}</a>' for url in report["excel"]]
-        built = datetime.fromtimestamp(report["built_at"]).strftime("%d/%m/%Y %H:%M")
-        cards.append(f'<article><h2>{escape(report["name"])}</h2><p>{escape(report["description"])}</p>'
-                     f'<p class="meta">Actualizado {built}</p><nav>{"".join(links)}</nav></article>')
-    empty = "<p class='empty'>Todavía no hay informes generados. Ver <code>docs/04-crear-informes.md</code>.</p>"
-    return DASHBOARD.replace("{cards}", "".join(cards) or empty)
-
-
-DASHBOARD = """<!doctype html><html lang="es"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Informes · Sofibot</title><style>
-:root{--blue:#2C3968;--orange:#D16B1B;--line:#dfe5ee}
-*{box-sizing:border-box}body{margin:0;background:#f4f7fb;color:var(--blue);font:16px/1.5 Roboto,Arial,sans-serif}
-header{background:var(--blue);color:#fff;padding:18px 24px}header h1{margin:0;font-size:22px;font-weight:500}
-main{max-width:1100px;margin:auto;padding:24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
-article{background:#fff;border:1px solid var(--line);border-top:4px solid var(--orange);border-radius:14px;padding:20px}
-h2{margin:0 0 6px;font-size:19px}.meta{font-size:13px;color:#566173}.empty{grid-column:1/-1}
-nav{display:flex;flex-wrap:wrap;gap:8px}a{color:var(--blue);font-weight:500;padding:7px 12px;border:1px solid var(--line);border-radius:8px;text-decoration:none}
-a.primary{background:var(--blue);color:#fff}a:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
-</style></head><body><header><h1>Sofibot · Informes</h1></header><main>{cards}</main></body></html>"""

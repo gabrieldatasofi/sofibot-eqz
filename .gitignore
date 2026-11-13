@@ -12,10 +12,21 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.consultas.example
+
+# Borradores escritos por la API de informes (docs/10-api-informes.md)
+# (en cualquier carpeta reports/, también la de Contoso; tienen correos de usuarios)
+.borradores/
+.admin/
+
+# Registro del servicio de consultas (docs/11-consultas.md)
+/consultas/
 
 # Informes generados y ficheros de datos: nunca en git.
 output/*
 !output/.gitkeep
+examples/contoso/output/
+examples/contoso/consultas/
 *.xlsx
 *.csv
 *.parquet
@@ -24,3 +35,13 @@ output/*
 
 # Guía interna de Datasofi: no se entrega a clientes.
 GUIA-DATASOFI.md
+
+# Permisos locales de Claude Code de cada persona
+.claude/settings.local.json
+
+# Certificado y clave privada del proxy HTTPS
+caddy/certs/*
+!caddy/certs/.gitkeep
+
+# Conectores MCP compilados (mcp-server/build-exe.ps1): se generan en cada versión, no van en git
+mcp-server/dist/

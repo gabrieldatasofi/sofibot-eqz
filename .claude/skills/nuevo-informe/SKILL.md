@@ -52,6 +52,11 @@ docker compose run --rm sofibot sofibot new <slug> --name "<Título>" --table go
 `<slug>`: lowercase words joined by `-`. Creating a project reads no data. If `sofibot` is
 installed locally (a Python virtual environment), `sofibot new ...` is equivalent.
 
+`reports/<slug>/report.json` "tables" must list every Gold table the report reads (the main
+table is already there). The build fails if a query reads a Gold table missing from it, and
+the portal shows the report only to users whose roles cover all of those tables. Never add a
+table "just in case": it would hide the report from users who could otherwise see it.
+
 ## 4. Write `reports/<slug>/generate.py`
 
 Edit the template and use `examples/contoso/reports/contoso-ventas-tiendas/generate.py`
@@ -64,9 +69,17 @@ as the model for a complete report. Rules:
 - Ratios from totals; never average row ratios; never add totals from different Gold
   tables; NULL means no data ("Sin datos").
 - Page: `Report.from_manifest(PROJECT, subtitle=..., kpi_columns=..., lang="es")`, KPIs,
-  `Chart(..., views=...)` for switchable metrics, tables with `filters=[...]` and
+  `Chart(..., views=...)` for switchable metrics, tables with real values (numbers, dates,
+  Decimals, never pre-formatted strings) plus `formats` like Workbook, `filters=[...]` and
   `source=TableSource(TABLE, "gold", [grain columns])`, `add_link("Descargar Excel", "<file>.xlsx")`.
   Spanish labels, Datasofi colours (BLUE, ORANGE, CYAN, TEAL).
+- Interactive reports (the default for dashboards): one aggregated `add_dataset` (e.g. month ×
+  store, a limited period, tens of thousands of rows at most), `add_filter` for period
+  (`kind="range"`) and the main dimensions, then `add_dynamic_kpi`, `add_dynamic_chart` and
+  `add_dynamic_table` with `Sum`/`Ratio`/`Distinct` (from `sofibot_eqz`). Every table and
+  chart gets an Excel button that downloads what it shows with the filters applied. Model:
+  `examples/contoso/reports/contoso-ventas-tiendas/generate.py`; reference:
+  docs/04-crear-informes.md, "Barra de filtros".
 - Excel: `Workbook.from_manifest(PROJECT, subtitle=...)`, `add_sheet`/`add_query` with real
   values and `formats` (`eur`, `usd`, `percent`, `integer`, `month`...), a note with definitions.
 - The final `print` only names the report.

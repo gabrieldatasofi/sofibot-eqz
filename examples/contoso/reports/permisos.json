@@ -1,0 +1,7 @@
+{
+  "roles": {
+    "Direccion": ["*"],
+    "Tiendas": ["gold.month_store"],
+    "Producto": ["gold.month_product"]
+  }
+}

@@ -16,10 +16,14 @@ dependencies = [
     "pyodbc>=5.2,<6",
     "xlsxwriter>=3.2,<4",
     "pandas>=2.2,<3",
+    "msal>=1.31,<2",           # inicio de sesión con Microsoft Entra ID
+    "itsdangerous>=2.2,<3",    # cookie de sesión firmada
+    "requests>=2.32,<3",       # el portal reenvía consultas al servicio de consultas
+    "markdown>=3.7,<4",        # documentación técnica en la página de administración
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]  # versiones exactas en requirements-dev.txt
+dev = ["pytest>=8", "httpx2>=2.16,<3"]  # versiones exactas en requirements-dev.txt
 
 [project.scripts]
 sofibot = "sofibot_eqz.cli:main"
@@ -28,7 +32,7 @@ sofibot = "sofibot_eqz.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-sofibot_eqz = ["assets/**/*", "template/*"]
+sofibot_eqz = ["assets/**/*", "template/*", "report_guide.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

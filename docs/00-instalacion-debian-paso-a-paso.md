@@ -264,8 +264,8 @@ y descargar su Excel.
 Si cambiaste el puerto en el paso 10, usa ese número en los dos sitios (`-L 8085:127.0.0.1:8085`
 y `http://localhost:8085`).
 
-Para que otras personas lo usen sin túnel, ver "Acceso desde la red" en
-[05 · Operación](05-operacion.md) (proxy con HTTPS recomendado, y contraseña del portal).
+Para que otras personas lo usen sin túnel, ver
+[08 · Acceso desde la red con HTTPS](08-acceso-https.md).
 
 ---
 
@@ -295,6 +295,7 @@ Sofibot está instalado. A partir de aquí:
 
 | Quiero… | Dónde |
 |---|---|
+| **Sofibot completo**: HTTPS, inicio de sesión con Microsoft, informes con IA, consultas y administración | [00 · Sofibot completo paso a paso](00-sofibot-completo-paso-a-paso.md) |
 | Crear informes | [04 · Crear informes](04-crear-informes.md) y [07 · Informes con IA](07-informes-con-ia.md) |
 | Regenerar los informes cada día | `SOFIBOT_BUILD_SCHEDULE` en [05 · Operación](05-operacion.md) |
 | Publicar el portal para más usuarios | [05 · Operación](05-operacion.md), "Acceso desde la red" |

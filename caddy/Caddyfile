@@ -1,0 +1,31 @@
+# Proxy HTTPS delante del portal (docs/08-acceso-https.md).
+# No hace falta editar este fichero: el nombre y el certificado se configuran en .env
+# (SOFIBOT_DOMAIN y SOFIBOT_TLS).
+{
+	# El contenedor no puede instalar su autoridad de certificación en los equipos:
+	# se reparte a mano (docs/08-acceso-https.md, opción B).
+	skip_install_trust
+	admin off
+}
+
+{$SOFIBOT_DOMAIN} {
+	# Vacío o "internal": certificado de la autoridad propia de Caddy.
+	# "/certs/cert.pem /certs/key.pem": certificado corporativo en caddy/certs/.
+	# Un correo electrónico: Let's Encrypt (solo dominios públicos).
+	tls {$SOFIBOT_TLS:internal}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	# Funcionalidad 2 (docs/11-consultas.md): su propio contenedor. Sin él, estas rutas dan 502.
+	handle /api/query* {
+		reverse_proxy consultas:8080
+	}
+
+	handle {
+		reverse_proxy sofibot:8080
+	}
+}

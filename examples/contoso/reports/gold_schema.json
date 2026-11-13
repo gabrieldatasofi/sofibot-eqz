@@ -1,0 +1,141 @@
+{
+  "source": "SQL Server",
+  "database": "ContosoRetailDW",
+  "schema": "gold",
+  "generated_at": "2026-10-29T11:04:19+00:00",
+  "note": "Structure only. It contains no rows, counts or values.",
+  "tables": {
+    "gold.month_product": {
+      "type": "table",
+      "description": "Ventas por mes y producto. Una fila por month y product_key. Mismas ventas que month_store: no sumar ambas tablas.",
+      "columns": [
+        {
+          "name": "month",
+          "type": "date",
+          "nullable": true,
+          "description": "Primer día del mes natural."
+        },
+        {
+          "name": "product_key",
+          "type": "int",
+          "nullable": false,
+          "description": "Identificador de producto."
+        },
+        {
+          "name": "product_name",
+          "type": "nvarchar(200)",
+          "nullable": true,
+          "description": "Nombre del producto."
+        },
+        {
+          "name": "brand",
+          "type": "nvarchar(60)",
+          "nullable": true,
+          "description": "Marca."
+        },
+        {
+          "name": "category",
+          "type": "nvarchar(60)",
+          "nullable": true,
+          "description": "Categoría."
+        },
+        {
+          "name": "subcategory",
+          "type": "nvarchar(60)",
+          "nullable": true,
+          "description": "Subcategoría."
+        },
+        {
+          "name": "sales_usd",
+          "type": "decimal(19,2)",
+          "nullable": true,
+          "description": "Venta neta en USD."
+        },
+        {
+          "name": "cost_usd",
+          "type": "decimal(19,2)",
+          "nullable": true,
+          "description": "Coste en USD."
+        },
+        {
+          "name": "gross_profit_usd",
+          "type": "decimal(19,2)",
+          "nullable": true,
+          "description": "sales_usd - cost_usd."
+        },
+        {
+          "name": "quantity",
+          "type": "int",
+          "nullable": true,
+          "description": "Unidades vendidas."
+        },
+        {
+          "name": "sales_lines",
+          "type": "int",
+          "nullable": true,
+          "description": "Líneas de venta."
+        }
+      ]
+    },
+    "gold.month_store": {
+      "type": "table",
+      "description": "Ventas por mes y tienda. Una fila por month y store_key.",
+      "columns": [
+        {
+          "name": "month",
+          "type": "date",
+          "nullable": true,
+          "description": "Primer día del mes natural."
+        },
+        {
+          "name": "store_key",
+          "type": "int",
+          "nullable": false,
+          "description": "Identificador de tienda. NULL = tienda desconocida."
+        },
+        {
+          "name": "store_name",
+          "type": "nvarchar(100)",
+          "nullable": true,
+          "description": "Nombre de la tienda."
+        },
+        {
+          "name": "country",
+          "type": "nvarchar(60)",
+          "nullable": true,
+          "description": "País de la tienda."
+        },
+        {
+          "name": "sales_usd",
+          "type": "decimal(19,2)",
+          "nullable": true,
+          "description": "Venta neta en USD."
+        },
+        {
+          "name": "cost_usd",
+          "type": "decimal(19,2)",
+          "nullable": true,
+          "description": "Coste en USD."
+        },
+        {
+          "name": "gross_profit_usd",
+          "type": "decimal(19,2)",
+          "nullable": true,
+          "description": "sales_usd - cost_usd. Margen % = suma de gross_profit_usd / suma de sales_usd."
+        },
+        {
+          "name": "quantity",
+          "type": "int",
+          "nullable": true,
+          "description": "Unidades vendidas."
+        },
+        {
+          "name": "sales_lines",
+          "type": "int",
+          "nullable": true,
+          "description": "Líneas de venta."
+        }
+      ]
+    }
+  }
+}

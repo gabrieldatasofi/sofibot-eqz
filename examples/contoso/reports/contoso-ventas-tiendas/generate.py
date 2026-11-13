@@ -1,5 +1,8 @@
-"""Contoso · Ventas por tienda: informe completo (KPIs, gráficos, tabla interactiva) + Excel.
+"""Contoso · Ventas por tienda: informe interactivo con barra de filtros + Excel.
 
+La página lleva los datos mes × tienda de los últimos 36 meses. La barra de filtros
+(periodo, país, tienda) recalcula en el navegador los KPIs, los gráficos y las tablas, y
+cada botón Excel descarga lo que muestra su gráfico o tabla con esos filtros.
 
 Lee gold.month_store (examples/contoso/01-crear-gold.sql). Construir con:
     sofibot build contoso-ventas-tiendas
@@ -8,11 +11,13 @@ import argparse
 from datetime import date
 from pathlib import Path
 
-from sofibot_eqz import Chart, Gold, Report, TableSource, Workbook
+from sofibot_eqz import Distinct, Gold, Ratio, Report, Sum, TableSource, Workbook
 
 BLUE, ORANGE, CYAN, TEAL = "#2C3968", "#D16B1B", "#279CDB", "#5DAEAB"
 PROJECT = Path(__file__).resolve().parent
 TABLE = "gold.month_store"
+MONTHS_IN_PAGE = 36   # meses que viajan dentro de la página (mes × tienda, agregados)
+DEFAULT_MONTHS = 12   # periodo seleccionado al abrir el informe
 
 
 def months_back(month: date, count: int) -> date:
@@ -29,55 +34,70 @@ def generate(output: Path) -> None:
         latest = query(f"SELECT MAX(month) FROM {TABLE}")[0][0]
         if latest is None:
             raise ValueError(f"{TABLE} is empty")
-        period = [months_back(latest, 11), latest]  # 12 meses completos hasta el último disponible
-        monthly = query(f"SELECT month, SUM(sales_usd), SUM(gross_profit_usd), SUM(quantity) FROM {TABLE} "
-                        "WHERE month BETWEEN ? AND ? GROUP BY month ORDER BY month", period)
-        countries = query(f"SELECT COALESCE(country, 'Online'), SUM(sales_usd) FROM {TABLE} "
-                          "WHERE month BETWEEN ? AND ? GROUP BY COALESCE(country, 'Online') ORDER BY 2 DESC", period)
-        stores = query(f"SELECT COALESCE(store_name, 'Online / desconocida'), COALESCE(country, 'Online'), SUM(sales_usd), "
-                       f"SUM(gross_profit_usd), SUM(quantity) FROM {TABLE} WHERE month BETWEEN ? AND ? "
-                       "GROUP BY COALESCE(store_name, 'Online / desconocida'), COALESCE(country, 'Online') ORDER BY 3 DESC", period)
-        detail = query(f"SELECT month, store_key, store_name, country, sales_usd, cost_usd, gross_profit_usd, quantity "
-                       f"FROM {TABLE} WHERE month BETWEEN ? AND ? ORDER BY month, store_key", period)
+        first = months_back(latest, MONTHS_IN_PAGE - 1)
+        default = (months_back(latest, DEFAULT_MONTHS - 1), latest)
+        rows = query(
+            f"SELECT month, YEAR(month), store_key, COALESCE(store_name, 'Online / desconocida'), "
+            f"COALESCE(country, 'Online'), sales_usd, cost_usd, gross_profit_usd, quantity FROM {TABLE} "
+            "WHERE month BETWEEN ? AND ? ORDER BY month, store_key", [first, latest])
 
-    label = f"{period[0]:%m/%Y} – {latest:%m/%Y}"
-    sales = sum(r[1] or 0 for r in monthly)
-    profit = sum(r[2] or 0 for r in monthly)
-    units = sum(r[3] or 0 for r in monthly)
-    margin = profit / sales if sales else None  # margen total / ventas totales, nunca la media de márgenes
+    columns = ["Mes", "Año", "Id tienda", "Tienda", "País", "Ventas", "Coste", "Margen", "Unidades"]
+    usd = {"Ventas": "usd", "Coste": "usd", "Margen": "usd"}
+    margin = Ratio("Margen", "Ventas")  # margen total / ventas totales, nunca la media de márgenes
 
-    report = Report.from_manifest(PROJECT, subtitle=label, kpi_columns=4, lang="es")
-    report.add_kpi("Ventas netas", sales, format="currency", detail="USD")
-    report.add_kpi("Margen bruto", profit, format="currency", detail="USD")
-    report.add_kpi("Margen %", "Sin datos" if margin is None else f"{margin:.1%}", detail="Margen total / ventas totales")
-    report.add_kpi("Unidades", units, format="integer")
+    report = Report.from_manifest(PROJECT, subtitle=f"Datos de {first:%m/%Y} a {latest:%m/%Y}", kpi_columns=5, lang="es")
+    report.add_dataset("ventas", columns, rows, formats={"Mes": "month", "Año": "text", **usd})
 
-    months = [f"{r[0]:%Y-%m}" for r in monthly]
-    views = {
-        "Ventas": [dict(x=months, y=[float(r[1]) for r in monthly], type="bar", name="Ventas", marker={"color": BLUE})],
-        "Margen": [dict(x=months, y=[float(r[2]) for r in monthly], type="bar", name="Margen", marker={"color": ORANGE})],
-        "Margen %": [dict(x=months, y=[float(100 * r[2] / r[1]) if r[1] else None for r in monthly], type="scatter",
-                          mode="lines+markers", name="Margen %", line={"color": TEAL})],
-    }
-    report.add_chart(Chart("Evolución mensual", views["Ventas"], layout={"yaxis": {"title": "USD"}}, width="full",
-                           views=views, view_layouts={"Margen %": {"yaxis": {"title": "%"}}}))
-    report.add_chart(Chart.pie("Ventas por país", [r[0] for r in countries], [float(r[1]) for r in countries]))
-    top = stores[:10][::-1]
-    report.add_chart(Chart.bar("Top 10 tiendas por ventas | USD", [r[0] for r in top], [float(r[2]) for r in top], orientation="h"))
-    report.add_table("Tiendas", ["Tienda", "País", "Ventas (USD)", "Margen (USD)", "Margen %", "Unidades"],
-                     [[r[0], r[1], f"{r[2]:,.2f}", f"{r[3]:,.2f}", f"{r[3] / r[2]:.1%}" if r[2] else "Sin datos", f"{r[4]:,}"]
-                      for r in stores],
-                     source=TableSource(TABLE, "gold", ["month", "store_key"]), filters=["País"])
-    report.add_link("Descargar Excel", "contoso-ventas-tiendas.xlsx")
-    report.add_note(f"Periodo: {label}, meses completos. Fuente: {TABLE}. El último mes puede estar incompleto.")
+    report.add_filter("Periodo", "Mes", kind="range", default=default)
+    report.add_filter("País", "País")
+    report.add_filter("Tienda", "Tienda")
+
+    report.add_dynamic_kpi("Ventas netas", "ventas", Sum("Ventas"), format="currency", detail="USD")
+    report.add_dynamic_kpi("Margen bruto", "ventas", Sum("Margen"), format="currency", detail="USD")
+    report.add_dynamic_kpi("Margen %", "ventas", margin, format="percent", detail="Margen total / ventas totales")
+    report.add_dynamic_kpi("Unidades", "ventas", Sum("Unidades"), format="integer")
+    report.add_dynamic_kpi("Tiendas con ventas", "ventas", Distinct("Id tienda"), format="integer")
+
+    report.add_dynamic_chart("Evolución de ventas y margen | USD", "ventas", {"Mes": "Mes", "Año": "Año"},
+                             [("Ventas", Sum("Ventas"), BLUE), ("Margen", Sum("Margen"), ORANGE)], width="full")
+    report.add_dynamic_chart("Ventas por país | USD", "ventas", "País", [("Ventas", Sum("Ventas"), CYAN)],
+                             kind="bar", order="desc")
+    report.add_dynamic_chart("Margen % por mes", "ventas", "Mes", [("Margen %", Ratio("Margen", "Ventas", 100), TEAL)],
+                             layout={"yaxis": {"ticksuffix": " %"}})
+    report.add_dynamic_chart("Top 10 tiendas por ventas | USD", "ventas", "Tienda", [("Ventas", Sum("Ventas"), BLUE)],
+                             kind="hbar", order="desc", top=10, width="full", height=460, layout={"margin": {"l": 190, "r": 25, "t": 40, "b": 45}})
+
+    source = TableSource(TABLE, "gold", ["month", "store_key"])
+    report.add_dynamic_table("Tiendas", "ventas", ["Tienda", "País"],
+                             [("Ventas", Sum("Ventas"), "usd"), ("Margen", Sum("Margen"), "usd"),
+                              ("Margen %", margin, "percent"), ("Unidades", Sum("Unidades"), "integer")],
+                             filters=["País"], source=source)
+    report.add_dynamic_table("Detalle mensual", "ventas", ["Mes", "Id tienda", "Tienda", "País", "Ventas", "Coste",
+                                                           "Margen", "Unidades"], filters=["País"], source=source)
+
+    label = f"{default[0]:%m/%Y} – {latest:%m/%Y}"
+    report.add_link("Descargar Excel completo", "contoso-ventas-tiendas.xlsx")
+    report.add_note(f"La página lleva {MONTHS_IN_PAGE} meses completos ({first:%m/%Y} – {latest:%m/%Y}); "
+                    f"al abrirla se muestran los últimos {DEFAULT_MONTHS}. El último mes puede estar incompleto.")
+    report.add_note("Los botones Excel de cada gráfico y tabla descargan lo que se ve con los filtros aplicados.")
+    report.add_note(f"Fuente: {TABLE}. Margen % = margen total / ventas totales.")
     report.write(output)
 
+    # Excel completo del informe: los últimos 12 meses, sin filtros.
+    period = [row for row in rows if row[0] >= default[0]]
+    stores: dict = {}
+    for row in period:
+        item = stores.setdefault((row[3], row[4]), [0, 0, 0])
+        item[0] += row[5] or 0
+        item[1] += row[7] or 0
+        item[2] += row[8] or 0
     workbook = Workbook.from_manifest(PROJECT, subtitle=label)
     workbook.add_sheet("Tiendas", ["Tienda", "País", "Ventas", "Margen", "Margen %", "Unidades"],
-                       [[r[0], r[1], r[2], r[3], (r[3] / r[2]) if r[2] else None, r[4]] for r in stores],
+                       sorted(([name, country, s, m, m / s if s else None, u] for (name, country), (s, m, u) in stores.items()),
+                              key=lambda r: r[2], reverse=True),
                        formats={"Ventas": "usd", "Margen": "usd", "Margen %": "percent"}, source=TABLE)
     workbook.add_sheet("Detalle mensual", ["Mes", "Id tienda", "Tienda", "País", "Ventas", "Coste", "Margen", "Unidades"],
-                       detail, formats={"Mes": "month", "Ventas": "usd", "Coste": "usd", "Margen": "usd"}, source=TABLE)
+                       [[r[0], *r[2:]] for r in period], formats={"Mes": "month", **usd}, source=TABLE)
     workbook.add_note("Margen % = margen total / ventas totales.")
     workbook.write(output / "contoso-ventas-tiendas.xlsx")
     print("Generated contoso-ventas-tiendas")  # nunca imprimir valores de datos

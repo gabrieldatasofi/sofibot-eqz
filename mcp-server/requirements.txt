@@ -1,0 +1,4 @@
+# Conectores MCP de Sofibot. Se instalan en el equipo de quien usa Claude o Codex, no en la
+# imagen Docker. mcp incluye httpx.
+mcp==1.30.0
+msal==1.39.0

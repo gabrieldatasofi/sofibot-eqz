@@ -1,4 +1,5 @@
 # docker compose up -d --build     -> portal en http://localhost:8080
+#                                     y, con COMPOSE_PROFILES=https, en https://SOFIBOT_DOMAIN
 # docker compose run --rm sofibot sofibot check      (y el resto de comandos `sofibot`)
 services:
   sofibot:
@@ -16,3 +17,49 @@ services:
       # Permite usar SQLSERVER_HOST=host.docker.internal para un SQL Server instalado en el propio equipo.
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
+
+  # Funcionalidad 2, consultas de datos (docs/11-consultas.md). Contenedor aparte, con su propia
+  # configuración (.env.consultas, no .env) y su propio login de SQL Server.
+  # Se activa con COMPOSE_PROFILES=consultas en .env (con HTTPS: COMPOSE_PROFILES=https,consultas).
+  consultas:
+    build: .
+    image: datasofi/sofibot-eqz:0.1.0
+    profiles: ["consultas"]
+    command: ["sofibot", "serve-consultas", "--host", "0.0.0.0", "--port", "8080"]
+    env_file:
+      - path: .env.consultas
+        required: false
+    user: "${SOFIBOT_UID:-10001}:${SOFIBOT_GID:-10001}"
+    ports:
+      - "${SOFIBOT_BIND:-127.0.0.1}:${SOFIBOT_QUERY_PORT:-8081}:8080"
+    volumes:
+      - ./reports:/app/reports:ro     # catalogo.json y permisos.json, solo lectura
+      - ./consultas:/app/consultas    # registro de preguntas y consultas
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # Proxy HTTPS para abrir el portal desde la red (docs/08-acceso-https.md).
+  # Se activa con COMPOSE_PROFILES=https en .env.
+  proxy:
+    image: caddy:2.8.4-alpine
+    profiles: ["https"]
+    depends_on:
+      - sofibot
+    # Solo estas dos variables: el proxy no recibe las credenciales de .env.
+    environment:
+      SOFIBOT_DOMAIN: ${SOFIBOT_DOMAIN:-}
+      SOFIBOT_TLS: ${SOFIBOT_TLS:-internal}
+    ports:
+      - "80:80"      # redirige a HTTPS
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/certs:/certs:ro
+      - caddy-data:/data      # certificados y autoridad propia de Caddy: no borrar
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:
