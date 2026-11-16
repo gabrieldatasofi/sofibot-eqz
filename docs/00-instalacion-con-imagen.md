@@ -5,8 +5,16 @@ Docker ya construida y probada, y vuestro servidor la descarga. Solo configurái
 `.env.consultas` y la carpeta `reports/`; el programa no se puede modificar, y vuestra
 instalación es idéntica a la que Datasofi ha probado.
 
-Sirve igual en un servidor Linux (recomendado) y en un PC con Windows y Docker Desktop
-(para probar). Tiempo aproximado: 20 minutos, más lo que tarde el DBA en crear el login.
+Sirve igual en un servidor Linux y en un PC con Windows y Docker Desktop: cada paso trae los
+comandos de los dos. Tiempo aproximado: 20 minutos, más lo que tarde el DBA en crear el login.
+
+> **Linux para producción, Windows para probar.** Para el uso diario se recomienda un
+> servidor Linux. Un PC con Windows y Docker Desktop sirve para probar, pero no como
+> servidor: se apaga o se suspende, y Docker no arranca hasta que alguien inicia sesión.
+> Docker Desktop tampoco está soportado en Windows Server. Además, Docker Desktop solo es
+> gratuito para empresas pequeñas (hoy, menos de 250 empleados y menos de 10 millones de
+> facturación anual); las demás necesitan una suscripción de pago: revisad las condiciones
+> de Docker antes de usarlo.
 
 > En los bloques de comandos, lo que va entre `< >` lo sustituyes tú (sin los `< >`).
 

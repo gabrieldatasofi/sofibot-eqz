@@ -17,6 +17,27 @@ Tiempo aproximado: 1 hora de trabajo, más lo que tarden el administrador de Ent
 > sustituyes tú (sin los `< >`). Todos los comandos del servidor se lanzan desde
 > `/opt/sofibot`.
 
+> **Linux para producción, Windows para probar.** Para el uso diario se recomienda un
+> servidor Linux. Un PC con Windows y Docker Desktop sirve para probar, pero no como
+> servidor: se apaga o se suspende, y Docker no arranca hasta que alguien inicia sesión.
+> Docker Desktop tampoco está soportado en Windows Server. Además, Docker Desktop solo es
+> gratuito para empresas pequeñas (hoy, menos de 250 empleados y menos de 10 millones de
+> facturación anual); las demás necesitan una suscripción de pago: revisad las condiciones
+> de Docker antes de usarlo.
+
+**Si lo probáis en Windows**, los comandos `docker compose …` son idénticos (en PowerShell,
+desde la carpeta de Sofibot). Solo cambian estos:
+
+| En la guía (Linux) | En Windows (PowerShell) |
+|---|---|
+| `cd /opt/sofibot` | `cd C:\sofibot` (o la carpeta donde lo instalasteis) |
+| `nano .env` | `notepad .env` |
+| `cp .env.consultas.example .env.consultas` | Igual: `cp` también funciona en PowerShell |
+| `mkdir -p consultas` | `mkdir consultas` |
+| `chmod 600 .env.consultas` | No hace falta: se protege con los permisos de la carpeta |
+| `sudo chown …` (dueño de las carpetas) | No hace falta |
+| `ping informes.empresa.local` | Igual |
+
 ---
 
 ## Quién hace qué
