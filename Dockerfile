@@ -6,6 +6,10 @@
 FROM python:3.12.16-slim-bookworm
 
 ARG MSODBCSQL_VERSION=18.7.1.1-1
+# Vincula la imagen publicada en ghcr.io al repositorio: hereda su visibilidad (privada) y permisos.
+LABEL org.opencontainers.image.source="https://github.com/gabrieldatasofi/sofibot-eqz" \
+      org.opencontainers.image.title="Sofibot EQZ" \
+      org.opencontainers.image.vendor="Datasofi"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl gnupg ca-certificates unixodbc tzdata \

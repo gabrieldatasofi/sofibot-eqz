@@ -45,3 +45,6 @@ caddy/certs/*
 
 # Conectores MCP compilados (mcp-server/build-exe.ps1): se generan en cada versión, no van en git
 mcp-server/dist/
+
+# Paquetes de instalación generados por publicar-imagen.ps1
+dist-instalacion/

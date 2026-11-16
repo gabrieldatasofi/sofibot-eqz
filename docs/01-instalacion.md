@@ -21,7 +21,7 @@ SQL Server**.
 
 Sofibot se puede instalar de dos maneras, según quién lo instale:
 
-| | Desarrollo (Datasofi) | Cliente (en preparación) |
+| | Desarrollo (Datasofi) | Cliente |
 |---|---|---|
 | Para | Quien desarrolla o adapta Sofibot | Quien solo lo usa y lo administra |
 | Cómo | `git clone` + `docker compose build` | `docker compose pull` de una imagen publicada por Datasofi |
@@ -30,11 +30,13 @@ Sofibot se puede instalar de dos maneras, según quién lo instale:
 | Actualizar | `git pull` + `docker compose build` + `up -d` | Cambiar la versión de la imagen + `docker compose pull` + `up -d` |
 | Conectores de Claude y Codex | Hay que generar `mcp-server/dist/sofibot-mcp.exe` con `build-exe.ps1` antes de construir | Vienen dentro de la imagen |
 
-Hoy está disponible la forma de desarrollo, que es la que describen este documento y la guía
-de Debian. La forma de cliente está prevista: Datasofi publicará cada versión como imagen
-en un registro, fijada por su huella (`@sha256:…`) y firmada, con un `compose.yaml` que la
-descarga en lugar de construirla, un contenedor de solo lectura y el `.exe` firmado. Así el
-cliente no tiene código que modificar y cada instalación es idéntica a la que se probó.
+Este documento y la guía de Debian describen la forma de desarrollo. La forma de cliente
+está en [00 · Instalación con imagen publicada](00-instalacion-con-imagen.md): Datasofi
+publica cada versión con `publicar-imagen.ps1` en GitHub Container Registry (privado) y
+entrega un paquete con un `compose.yaml` que descarga esa imagen fijada por su huella
+(`@sha256:…`). Así el cliente no tiene código que modificar y su instalación es idéntica a
+la que se probó. Quedan para más adelante la firma de la imagen y del `.exe` y el contenedor
+de solo lectura.
 
 ## Instalación
 
@@ -143,10 +145,10 @@ construida como fichero:
 ```bash
 # En un equipo con internet (Datasofi)
 docker compose build
-docker save datasofi/sofibot-eqz:0.1.0 -o sofibot-eqz-0.1.0.tar
+docker save datasofi/sofibot-eqz:0.2.0 -o sofibot-eqz-0.2.0.tar
 
 # En el servidor
-docker load -i sofibot-eqz-0.1.0.tar
+docker load -i sofibot-eqz-0.2.0.tar
 docker compose up -d --no-build
 ```
 

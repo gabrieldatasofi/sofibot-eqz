@@ -139,9 +139,11 @@ Python.
 Dos formas, según quién instala ([01 · Instalación](01-instalacion.md#dos-formas-de-instalar)):
 
 - **Desarrollo** (hoy): `git clone` + `docker compose build`. El código está en el servidor.
-- **Cliente** (prevista): `docker compose pull` de una imagen versionada, firmada y fijada por
-  huella, publicada por Datasofi, con el `.exe` de los conectores dentro. El cliente solo
-  configura `.env`, `.env.consultas` y `reports/`, y no puede modificar el código.
+- **Cliente**: `docker compose pull` de una imagen versionada y fijada por huella, que
+  Datasofi publica en GitHub Container Registry con `publicar-imagen.ps1` (tras pasar los
+  tests dentro de la imagen), con el `.exe` de los conectores dentro. El cliente recibe un
+  paquete sin código y solo configura `.env`, `.env.consultas` y `reports/`
+  ([00 · Instalación con imagen](00-instalacion-con-imagen.md)).
 
 ## Reglas de seguridad clave
 

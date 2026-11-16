@@ -5,5 +5,5 @@ from .dynamic import Distinct, Ratio, Sum
 from .excel import Workbook
 from .html import Chart, KPI, Report, Table, TableSource
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = ["Chart", "Distinct", "Gold", "KPI", "Ratio", "Report", "Settings", "Sum", "Table", "TableSource", "Workbook"]
