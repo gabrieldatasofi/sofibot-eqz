@@ -3,6 +3,12 @@
 Toda la configuración está en el fichero `.env` (plantilla: `.env.example`). Tras
 cambiarlo: `docker compose up -d` (recrea el contenedor con los nuevos valores).
 
+Para comprobar qué falta sin mostrar ningún valor: `docker compose run --rm sofibot sofibot config`
+(y `docker compose run --rm consultas sofibot config --consultas` para `.env.consultas`).
+Dice qué variables están rellenas o faltan y los modos activos (`sql`/`entra`, `on`/`off`,
+el esquema Gold), nunca contraseñas, tokens, servidores ni URLs: su salida se puede enseñar
+a quien os ayude, también a un asistente de IA.
+
 ## SQL Server
 
 | Variable | Por defecto | Descripción |

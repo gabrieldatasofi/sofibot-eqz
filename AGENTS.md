@@ -57,6 +57,9 @@ Use the `nuevo-informe` skill (.claude/skills/nuevo-informe/SKILL.md). In short:
     `mcp-server/sofibot_consultas_mcp.py`; the portal's /consultas page only forwards the
     user's own token to it; docs/11.
   Never add a data path from one to the other.
+- `instalacion/`: AI-assistant rules shipped at the root of the install package (`AGENTS.md`,
+  `CLAUDE.md`, `.claude/settings.json`); keep them in sync with docs/00-instalacion-con-ia.md
+  (shipped as `INSTALAR-CON-IA.md`) and `publicar-imagen.ps1`.
 - Docs for the client in `docs/` (Spanish). Keep them in sync with behaviour changes.
 - Tests: `pytest` (no database needed).
 - Datasofi visual style: blue #2C3968, orange #D16B1B, cyan #279CDB, teal #5DAEAB, Roboto.

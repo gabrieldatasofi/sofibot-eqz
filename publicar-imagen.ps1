@@ -15,7 +15,8 @@
     3. Pasa los tests dentro de la imagen: si fallan, no se publica nada.
     4. Sube la imagen y anota su huella (sha256).
     5. Genera dist-instalacion\sofibot-eqz-<versión>.tar.gz: compose.yaml que descarga esa
-       imagen fijada por su huella (sin código), plantillas .env, Caddyfile, script SQL y docs.
+       imagen fijada por su huella (sin código), plantillas .env, Caddyfile, script SQL, docs,
+       INSTALAR-CON-IA.md y las reglas para asistentes de IA (carpeta instalacion\).
 #>
 param([string]$Version = '', [switch]$SinSubir)
 $ErrorActionPreference = 'Stop'
@@ -84,10 +85,19 @@ name: sofibot-eqz
 "@
 $compose = $header + (($compose -split "`n" | Where-Object { $_ -notmatch '^# docker compose (up|run)|^#\s+y, con COMPOSE_PROFILES' }) -join "`n")
 [IO.File]::WriteAllText((Join-Path $out 'compose.yaml'), ($compose -replace "`r`n", "`n"), (New-Object System.Text.UTF8Encoding($false)))
-# INSTALAR.md va en la raíz del paquete: sus enlaces a otros documentos pasan a apuntar a docs/.
-$guide = Get-Content (Join-Path $root 'docs\00-instalacion-con-imagen.md') -Raw -Encoding UTF8
-$guide = $guide -replace '\]\((?!https?://|#|docs/)([0-9A-Za-z][\w.-]*\.md)', '](docs/$1'
-[IO.File]::WriteAllText((Join-Path $out 'INSTALAR.md'), $guide, (New-Object System.Text.UTF8Encoding($false)))
+# INSTALAR.md e INSTALAR-CON-IA.md van en la raíz del paquete: sus enlaces a otros documentos
+# pasan a apuntar a docs/.
+foreach ($pair in @(@('00-instalacion-con-imagen.md', 'INSTALAR.md'), @('00-instalacion-con-ia.md', 'INSTALAR-CON-IA.md'))) {
+    $guide = Get-Content (Join-Path $root "docs\$($pair[0])") -Raw -Encoding UTF8
+    $guide = $guide -replace '\]\((?!https?://|#|docs/)([0-9A-Za-z][\w.-]*\.md)', '](docs/$1'
+    [IO.File]::WriteAllText((Join-Path $out $pair[1]), $guide, (New-Object System.Text.UTF8Encoding($false)))
+}
+# Reglas para asistentes de IA abiertos en la carpeta de instalación: AGENTS.md (Codex y
+# otros), CLAUDE.md y .claude/settings.json (bloqueos reales en Claude Code).
+New-Item -ItemType Directory -Force (Join-Path $out '.claude') | Out-Null
+foreach ($file in 'AGENTS.md', 'CLAUDE.md', '.claude\settings.json') {
+    Copy-Item (Join-Path $root "instalacion\$file") (Join-Path $out $file)
+}
 
 $archive = Join-Path $dist "$name.tar.gz"
 Remove-Item $archive -ErrorAction SilentlyContinue

@@ -52,6 +52,7 @@ docker compose up -d                                   # portal: http://localhos
 |---|---|---|
 | [00 · Probar en Windows](docs/00-prueba-en-windows.md) | Quien prueba | **Empezad aquí para probar**: Docker Desktop en un PC con Windows, comando a comando |
 | [00 · Instalación paso a paso en Debian](docs/00-instalacion-debian-paso-a-paso.md) | Sistemas | Para el uso diario: de un servidor Debian vacío a Sofibot funcionando, comando a comando |
+| [00 · Instalación con ayuda de un asistente de IA](docs/00-instalacion-con-ia.md) | El asistente de IA (Claude Code, Codex) de quien instala | Guion para que el asistente guíe la instalación sin ver contraseñas ni datos. Va en el paquete como `INSTALAR-CON-IA.md`, con `AGENTS.md`, `CLAUDE.md` y `.claude/settings.json` |
 | [00 · Instalación con imagen publicada](docs/00-instalacion-con-imagen.md) | Sistemas del cliente / Datasofi | Instalar sin código fuente: `docker compose pull` de la imagen publicada por Datasofi. Incluye cómo publicar una versión y dar acceso de solo lectura |
 | [00 · Sofibot completo paso a paso](docs/00-sofibot-completo-paso-a-paso.md) | Sistemas / Administrador de Entra ID | Después de la anterior: HTTPS, Entra ID (con checklist para su administrador), informes con IA, consultas, permisos y conectores de Claude y Codex |
 | [01 · Instalación](docs/01-instalacion.md) | Sistemas | Referencia: requisitos, carpetas, versiones, actualización, instalación sin internet |

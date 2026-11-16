@@ -18,13 +18,17 @@ comandos de los dos. Tiempo aproximado: 20 minutos, más lo que tarde el DBA en 
 
 > En los bloques de comandos, lo que va entre `< >` lo sustituyes tú (sin los `< >`).
 
+> **¿Instaláis con ayuda de un asistente de IA (Claude Code, Codex…)?** Abrid la carpeta del
+> paquete con él y pedidle que siga `INSTALAR-CON-IA.md`: os guía paso a paso sin ver vuestras
+> contraseñas ni vuestros datos. Lee antes [Asistentes de IA y esta carpeta](#asistentes-de-ia-y-esta-carpeta).
+
 ---
 
 ## Qué os entrega Datasofi
 
 | Qué | Para qué |
 |---|---|
-| `sofibot-eqz-<versión>.tar.gz` | El paquete de instalación: `compose.yaml`, plantillas de configuración, `Caddyfile`, el script SQL para el DBA (`sql/crear-login-lectura.sql`) y la documentación. **No contiene el código del programa**, que va dentro de la imagen |
+| `sofibot-eqz-<versión>.tar.gz` | El paquete de instalación: `compose.yaml`, plantillas de configuración, `Caddyfile`, el script SQL para el DBA (`sql/crear-login-lectura.sql`), la documentación, `INSTALAR-CON-IA.md` y las reglas para asistentes de IA. **No contiene el código del programa**, que va dentro de la imagen |
 | Un usuario de GitHub y un **token de solo lectura** | Descargar la imagen del registro privado de Datasofi (`ghcr.io`). Solo permite descargar |
 
 El `compose.yaml` del paquete apunta a la versión exacta de la imagen por su huella
@@ -101,16 +105,20 @@ contenedor pueda escribir en las carpetas: `echo "SOFIBOT_UID=$(id -u)" >> .env`
 
 ```bash
 docker compose pull
+docker compose run --rm sofibot sofibot config
 docker compose run --rm sofibot sofibot check
 docker compose run --rm sofibot sofibot schema
 ```
 
-✅ **Bien si** `pull` descarga sin errores, `check` termina con `Connection OK` y `schema`
-escribe `reports/gold_schema.json`.
+✅ **Bien si** `pull` descarga sin errores, `config` termina con `Configuración completa`,
+`check` termina con `Connection OK` y `schema` escribe `reports/gold_schema.json`.
 
 ❌ **Si no**:
 - `pull` dice `denied` o `unauthorized` → repetid el paso 2.
 - `pull` dice `manifest unknown` → esa versión no está publicada: avisad a Datasofi.
+- `config` dice `FALTA: …` → corregid esa variable en `.env` (paso 3). `config` nunca
+  muestra los valores, solo si cada variable está rellena: su salida se puede enseñar a
+  quien os ayude.
 - `check` falla → el mensaje dice qué hacer; más casos en [Solución de problemas](solucion-de-problemas.md).
 
 ## Paso 5 · Arrancar
@@ -167,6 +175,31 @@ otras aplicaciones Docker, por ejemplo otra instalación de Sofibot. Si el puert
 ocupado, cambiad en `.env` `SOFIBOT_PORT` (y `SOFIBOT_QUERY_PORT`, si usáis consultas). El
 proxy HTTPS usa los puertos 80 y 443: si ya hay otro proxy en el equipo, no activéis el
 perfil `https` y añadid Sofibot a ese proxy ([08 · HTTPS](08-acceso-https.md)).
+
+## Asistentes de IA y esta carpeta
+
+La carpeta de instalación contiene las contraseñas del SQL Server (`.env`, `.env.consultas`)
+y, con Docker, da acceso a la base. Un asistente de IA abierto en ella trabaja con vuestros
+permisos: si nada se lo impide, puede leer `.env` y consultar la base **por fuera de
+Sofibot**, sin permisos por usuario, sin registro y enviando los datos a su proveedor. Por
+eso el paquete trae:
+
+| Fichero | Para quién | Qué hace |
+|---|---|---|
+| `INSTALAR-CON-IA.md` | Cualquier asistente | Guion de instalación: qué ejecuta el asistente y qué ejecutáis vosotros (todo lo que toca contraseñas o la base) |
+| `AGENTS.md` | Codex y otros | Las reglas: no leer `.env` ni datos, no ejecutar nada contra la base. Es una **instrucción**, no un bloqueo |
+| `CLAUDE.md` y `.claude/settings.json` | Claude Code | Las mismas reglas y, además, **bloqueos reales**: Claude Code no puede leer esos ficheros ni ejecutar `sqlcmd`, `docker compose run`, `docker exec`… |
+
+No borréis ni editéis estos ficheros. Con Codex u otros asistentes, revisad cada comando
+antes de aprobarlo. Lo más seguro sigue siendo instalar sin asistente, o pegarle solo los
+mensajes de error a uno que no tenga acceso a la carpeta.
+
+Para consultar datos con IA, la vía es el conector **Sofibot consultas** (parte D de
+*Después de arrancar*): aplica los permisos de cada usuario y registra cada consulta. Las
+protecciones de cada funcionalidad están en [06 · Seguridad](06-seguridad.md).
+
+En Linux, proteged además la configuración para que solo la lea el usuario que gestiona
+Sofibot: `chmod 600 .env` (y `.env.consultas`, cuando lo creéis).
 
 ## Qué queda en vuestro equipo
 

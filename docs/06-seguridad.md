@@ -81,6 +81,33 @@ separado de los informes: su propio contenedor, su propio fichero de configuraci
 
 ## Asistentes de IA
 
+### Qué protege cada capa
+
+Las políticas de cada funcionalidad **no dependen de que el asistente lea ninguna
+instrucción**: las aplica el servidor de Sofibot o SQL Server.
+
+| Capa | Protección |
+|---|---|
+| Funcionalidad 1, informes: la API no tiene ninguna ruta que devuelva datos; solo esquema y borradores de las tablas del rol del usuario; la vista previa y la publicación las hace un revisor | **Bloqueo real** en el servidor |
+| Funcionalidad 2, consultas: solo medidas y dimensiones del catálogo (no acepta SQL), tablas del rol del usuario, máximo de filas y de consultas por minuto, registro de cada consulta | **Bloqueo real** en el servidor |
+| Base de datos: un login por funcionalidad, que solo lee las tablas Gold o las del catálogo | **Bloqueo real** en SQL Server |
+| Carpeta de instalación con **Claude Code**: `.claude/settings.json` le impide leer `.env` y los datos y ejecutar `sqlcmd`, `docker compose run`, `docker exec`… | **Bloqueo real** en Claude Code |
+| Carpeta de instalación con **Codex** u otros asistentes: `AGENTS.md` e `INSTALAR-CON-IA.md` | **Instrucción**: suelen seguirla, pero no es una barrera |
+| Siempre: lo que toca contraseñas o la base lo ejecuta una persona | Procedimiento |
+
+Las instrucciones de los conectores (qué conector usar, preguntar si hay duda) son solo
+texto para el asistente; aunque las ignorase, no podría saltarse las tres primeras capas.
+
+**El punto débil es la carpeta de instalación.** Ahí el asistente no pasa por Sofibot: trabaja
+con los permisos de quien lo usa, que tiene `.env` y Docker. Sin reglas podría leer la
+contraseña y consultar la base por fuera de Sofibot, sin permisos por usuario, sin registro
+y enviando los datos a su proveedor. Por eso el paquete de instalación trae `AGENTS.md`,
+`CLAUDE.md`, `.claude/settings.json` e `INSTALAR-CON-IA.md`
+([00 · Instalación con imagen](00-instalacion-con-imagen.md#asistentes-de-ia-y-esta-carpeta)).
+Para consultar datos con IA, la vía es el conector *Sofibot consultas*.
+
+### Asistentes que escriben informes
+
 Si se usan asistentes de IA (Claude Code, Copilot, Codex…) para escribir informes:
 
 - El asistente trabaja **solo con la estructura** (`reports/gold_schema.json`), que no

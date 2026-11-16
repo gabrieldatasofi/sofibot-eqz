@@ -1,5 +1,6 @@
 """sofibot: command line of Sofibot for Equivalenza.
 
+    sofibot config [--consultas]        which settings are filled in or missing (never their values)
     sofibot check                       test the SQL Server connection (reads no rows)
     sofibot schema                      write reports/gold_schema.json (structure only)
     sofibot new SLUG --name N --table gold.T   create a report project from the template
@@ -19,6 +20,19 @@
 import argparse
 import json
 import sys
+
+
+def show_config(args) -> int:
+    from .settings_check import review
+
+    lines, problems = review(service="consultas" if args.consultas else "portal")
+    print("\n".join(lines))
+    print()
+    for problem in problems:
+        print(f"FALTA: {problem}")
+    target = ".env.consultas" if args.consultas else ".env"
+    print("Configuración completa" if not problems else f"Hay {len(problems)} cosas por corregir en {target}")
+    return 0 if not problems else 1
 
 
 def check(_args) -> int:
@@ -241,6 +255,9 @@ def query_record(args) -> int:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="sofibot", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True, metavar="command")
+    command = commands.add_parser("config", help="which settings are filled in or missing (never their values)")
+    command.add_argument("--consultas", action="store_true", help="check the query service settings (.env.consultas)")
+    command.set_defaults(run=show_config)
     commands.add_parser("check", help="test the SQL Server connection").set_defaults(run=check)
     command = commands.add_parser("schema", help="write the Gold schema contract")
     command.add_argument("--stdout", action="store_true", help="print it instead of writing reports/gold_schema.json")
