@@ -16,7 +16,7 @@ Sirve igual en un servidor Linux (recomendado) y en un PC con Windows y Docker D
 
 | Qué | Para qué |
 |---|---|
-| `sofibot-eqz-<versión>.tar.gz` | El paquete de instalación: `compose.yaml`, plantillas de configuración, `Caddyfile`, script SQL y documentación. **No contiene código** |
+| `sofibot-eqz-<versión>.tar.gz` | El paquete de instalación: `compose.yaml`, plantillas de configuración, `Caddyfile`, el script SQL para el DBA (`sql/crear-login-lectura.sql`) y la documentación. **No contiene el código del programa**, que va dentro de la imagen |
 | Un usuario de GitHub y un **token de solo lectura** | Descargar la imagen del registro privado de Datasofi (`ghcr.io`). Solo permite descargar |
 
 El `compose.yaml` del paquete apunta a la versión exacta de la imagen por su huella
@@ -30,8 +30,13 @@ descargaría siempre la probada.
   herramientas básicas e instalar Docker) y volved aquí. **No hagáis el paso 4** (descargar
   el código): con esta forma no hace falta.
 - **PC con Windows**: Docker Desktop instalado y arrancado.
-- El **login de solo lectura** de SQL Server (`sql/crear-login-lectura.sql`, lo ejecuta el DBA)
-  y que el equipo llegue al SQL Server por red ([02 · Conexión](02-conexion-sql-server.md)).
+- El **login de solo lectura** de SQL Server, ya creado por el DBA. El script que lo crea
+  está en el paquete, en `sql/crear-login-lectura.sql`: es un fichero de texto que se abre
+  con SSMS o VS Code, no hace falta el resto del paquete. **Enviádselo al DBA antes de
+  empezar**: tiene las instrucciones en su cabecera (cambiar la contraseña y la base de datos
+  y ejecutarlo) y os devuelve el usuario y la contraseña para el paso 3. Si vais a usar las
+  consultas, el mismo script crea el segundo login (`sofibot_consultas`).
+- Que el equipo llegue al SQL Server por red ([02 · Conexión](02-conexion-sql-server.md)).
 
 ---
 
