@@ -1,7 +1,8 @@
 # 00 · Sofibot completo paso a paso: HTTPS, Entra ID, informes con IA y consultas
 
-Continuación de [00 · Instalación paso a paso en Debian](00-instalacion-debian-paso-a-paso.md).
-Allí queda Sofibot funcionando con el portal de informes. Esta guía añade todo lo demás:
+Continuación de [00 · Instalación con imagen publicada](00-instalacion-con-imagen.md) o de
+[00 · Instalación paso a paso en Debian](00-instalacion-debian-paso-a-paso.md). Con cualquiera
+de las dos queda Sofibot funcionando con el portal de informes. Esta guía añade todo lo demás:
 
 - acceso desde la red con **HTTPS**;
 - inicio de sesión de cada persona con su cuenta de **Microsoft Entra ID**;
@@ -32,7 +33,7 @@ Tiempo aproximado: 1 hora de trabajo, más lo que tarden el administrador de Ent
 
 | Qué | Para qué | Quién te lo da |
 |---|---|---|
-| Sofibot instalado con la guía de Debian (pasos 1 a 12) | La base | — |
+| Sofibot instalado y arrancado (con imagen publicada, o con la guía de Debian pasos 1 a 12) | La base | — |
 | Un nombre para el portal, por ejemplo `informes.empresa.local` | HTTPS y Entra ID | Sistemas / DNS |
 | Un certificado para ese nombre (o usar la autoridad propia de Caddy) | HTTPS | Sistemas |
 | Que el servidor salga a internet por HTTPS hacia `login.microsoftonline.com` | Entra ID | Sistemas / redes |

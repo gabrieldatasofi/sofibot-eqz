@@ -115,11 +115,24 @@ docker compose ps
 ✅ **Bien si** `sofibot` aparece `running (healthy)` y `http://localhost:8080` (desde el propio
 equipo) abre Sofibot.
 
-A partir de aquí, el resto de la configuración es igual que en cualquier instalación:
-HTTPS, inicio de sesión con Microsoft, informes con IA, consultas, permisos y conectores de
-Claude y Codex. Seguid [00 · Sofibot completo paso a paso](00-sofibot-completo-paso-a-paso.md)
-(está en la carpeta `docs/` del paquete). Donde esa guía diga `docker compose up -d`, sirve
-tal cual: `docker compose build` no hace falta nunca.
+---
+
+## Después de arrancar
+
+Sofibot ya funciona en el propio equipo. Para que lo use vuestra gente queda configurar, en
+este orden, lo que explica con detalle [00 · Sofibot completo paso a paso](00-sofibot-completo-paso-a-paso.md)
+(en la carpeta `docs/` del paquete):
+
+| Parte | Quién | Qué |
+|---|---|---|
+| **A · HTTPS** | Sistemas | Un nombre en el DNS (por ejemplo `informes.empresa.local`), un certificado y el proxy activado, para entrar desde otros PCs |
+| **B · Entra ID** | Administrador de Entra ID | Una checklist: registrar la aplicación, secreto, roles, exponer la API, cliente público, consentimiento y asignar los roles a grupos |
+| **C · Inicio de sesión e informes con IA** | Sistemas | Añadir al `.env` los datos de Entra ID y `docker compose up -d` |
+| **D · Consultas** | DBA, Sistemas y Datasofi | Segundo login (`sofibot_consultas`), `.env.consultas`, el catálogo de consultas que prepara Datasofi y activar el servicio |
+| **E · Permisos y usuarios** | Administrador de Sofibot | En el portal, **Administración → Permisos**: qué tablas ve cada rol. Después, cada usuario conecta su Claude o Codex desde **Conectar tu IA** |
+
+En esa guía, donde diga `docker compose up -d` sirve tal cual. `docker compose build` no
+hace falta nunca con esta forma de instalar.
 
 ---
 

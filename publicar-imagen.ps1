@@ -84,7 +84,10 @@ name: sofibot-eqz
 "@
 $compose = $header + (($compose -split "`n" | Where-Object { $_ -notmatch '^# docker compose (up|run)|^#\s+y, con COMPOSE_PROFILES' }) -join "`n")
 [IO.File]::WriteAllText((Join-Path $out 'compose.yaml'), ($compose -replace "`r`n", "`n"), (New-Object System.Text.UTF8Encoding($false)))
-Copy-Item (Join-Path $root 'docs\00-instalacion-con-imagen.md') (Join-Path $out 'INSTALAR.md')
+# INSTALAR.md va en la raíz del paquete: sus enlaces a otros documentos pasan a apuntar a docs/.
+$guide = Get-Content (Join-Path $root 'docs\00-instalacion-con-imagen.md') -Raw -Encoding UTF8
+$guide = $guide -replace '\]\((?!https?://|#|docs/)([0-9A-Za-z][\w.-]*\.md)', '](docs/$1'
+[IO.File]::WriteAllText((Join-Path $out 'INSTALAR.md'), $guide, (New-Object System.Text.UTF8Encoding($false)))
 
 $archive = Join-Path $dist "$name.tar.gz"
 Remove-Item $archive -ErrorAction SilentlyContinue
