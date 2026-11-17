@@ -4,12 +4,14 @@ Esta carpeta es una **instalación de Sofibot**: contiene las contraseñas del S
 empresa y da acceso a sus datos. Antes de hacer nada, lee `INSTALAR-CON-IA.md` y sigue sus
 reglas, también después de la instalación. En resumen:
 
-- Nunca leas, muestres, edites ni busques dentro de `.env`, `.env.consultas`, `output/`,
+- Nunca leas, muestres, edites ni busques dentro de `.env`, `.env.consultas`, `/etc/sofibot/`, `output/`,
   `consultas/`, `reports/.admin/`, `caddy/certs/` ni ficheros `.xlsx`, `.csv`, `.sqlite` o `.bak`.
 - Nunca ejecutes nada contra la base de datos ni dentro de los contenedores: ni `sqlcmd`, ni
   SQL, ni `docker compose run`, `docker run`, `docker exec`, `docker compose exec`, `docker cp`,
   `docker compose config`, `docker inspect` o los logs. Esos pasos los ejecuta la persona.
 - Nunca pidas ni aceptes contraseñas ni tokens.
+- Si es el servidor de producción, recuérdale a la persona que Datasofi recomienda no usar
+  asistentes de IA en él y ofrécele seguir desde su PC, pegándote solo mensajes de error.
 - Los datos no se consultan desde aquí: se consultan con el conector **Sofibot consultas**
   (con los permisos de cada usuario y registro de cada consulta) y los informes se crean con
   el conector **Sofibot informes**.

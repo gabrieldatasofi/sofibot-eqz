@@ -22,7 +22,7 @@ Esta carpeta es la instalación de Sofibot de una empresa: **contiene las contra
 SQL Server y da acceso a sus datos**. Sofibot está diseñado para que ningún asistente de IA
 vea esos datos ni esas credenciales fuera de los conectores aprobados.
 
-1. **Nunca leas, muestres, edites ni busques dentro de** `.env`, `.env.consultas`, `output/`,
+1. **Nunca leas, muestres, edites ni busques dentro de** `.env`, `.env.consultas`, `/etc/sofibot/`, `output/`,
    `consultas/`, `reports/.admin/`, `caddy/certs/` ni ficheros `.xlsx`, `.csv`, `.sqlite` o
    `.bak`. Tampoco con otro comando (`cat`, `type`, `Get-Content`, `Select-String`, `grep`,
    `findstr`, `more`, scripts…). `.env.example` y `.env.consultas.example` sí puedes leerlos:
@@ -65,9 +65,17 @@ faltan, nunca sus valores.
 
 ## Pasos
 
-Antes de empezar, pregunta a la persona si instala en **Linux** o en **Windows** (con Docker
-Desktop) y usa los comandos de ese sistema. Para producción se recomienda Linux; Windows
-sirve para probar.
+Antes de empezar, pregunta a la persona:
+
+1. **¿Es el servidor de producción?** Si lo es, díselo claramente: Datasofi recomienda **no
+   usar asistentes de IA en el servidor de producción**. Ofrécele seguir desde su PC: tú le
+   das los comandos y ella te pega solo los mensajes de error (nunca contraseñas ni datos).
+   Si aun así quiere seguir aquí, continúa con las reglas y, al terminar el paso 7, guíala
+   por *Producción en Linux: secretos fuera de la carpeta* de `INSTALAR.md`: después de eso
+   tú ya no podrás leer las contraseñas ni usar Docker, y es lo que se pretende.
+2. **¿Linux o Windows** (con Docker Desktop)? Usa los comandos de ese sistema. Para
+   producción se recomienda Linux; Windows sirve para probar.
+3. **¿Qué cuenta de IA usa?** Recomiéndale la cuenta de empresa aprobada, no una personal.
 
 ### Paso 0 · Requisitos
 
@@ -174,6 +182,13 @@ docker compose ps
 `http://localhost:8080` abre Sofibot en el propio equipo. Si el puerto 8080 está ocupado,
 la persona cambia `SOFIBOT_PORT` en `.env` y repite este paso.
 
+### Paso 8 · Solo producción en Linux: secretos fuera de la carpeta
+
+Guíala por la sección *Producción en Linux: secretos fuera de la carpeta* de `INSTALAR.md`:
+contraseñas a `/etc/sofibot` (solo root), carpetas de datos solo para el contenedor y Docker
+solo con `sudo`. Todos sus comandos los ejecuta la persona (llevan `sudo`). Al terminar, tú
+ya no tendrás acceso a Docker: los comandos posteriores también los ejecuta ella, con `sudo`.
+
 ### Después de arrancar
 
 Sofibot funciona en el propio equipo. Lo siguiente (HTTPS, Entra ID, consultas, permisos y
@@ -196,7 +211,9 @@ estas:
 | Base de datos (logins que solo leen las tablas Gold o el catálogo) | **Bloqueo real** en SQL Server |
 | Esta carpeta con **Claude Code** | **Bloqueo real**: `.claude/settings.json` le impide leer `.env` y los datos y ejecutar los comandos peligrosos |
 | Esta carpeta con **Codex** u otros asistentes | **Instrucción** (`AGENTS.md`): suelen seguirla, pero no es una barrera. Revisa cada comando antes de aprobarlo |
+| Servidor Linux con *Producción en Linux* aplicado | **Bloqueo real** del sistema operativo: tu usuario ya no lee las contraseñas, los datos ni usa Docker sin `sudo` |
 | Siempre | Lo que toca contraseñas o la base lo ejecutas tú, no el asistente |
 
-Si no necesitas ayuda, lo más seguro es instalar sin asistente siguiendo `INSTALAR.md`, o
-pegarle solo los mensajes de error a un asistente que no tenga acceso a esta carpeta.
+Datasofi recomienda no usar asistentes de IA en el servidor de producción: lo más seguro es
+instalar siguiendo `INSTALAR.md` y, si necesitas ayuda, pegarle solo los mensajes de error a un
+asistente en tu PC, con la cuenta de empresa.

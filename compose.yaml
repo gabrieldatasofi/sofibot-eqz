@@ -5,7 +5,12 @@ services:
   sofibot:
     build: .
     image: datasofi/sofibot-eqz:0.2.1
-    env_file: .env
+    env_file:
+      - path: .env
+      # Producción en Linux: contraseñas y tokens fuera de esta carpeta, solo legibles por root
+      # (docs/00-instalacion-con-imagen.md#producción-en-linux-secretos-fuera-de-la-carpeta).
+      - path: ${SOFIBOT_SECRETS_DIR:-/etc/sofibot}/secretos.env
+        required: false
     # En Linux, carpetas montadas propiedad de otro usuario: SOFIBOT_UID/SOFIBOT_GID en .env.
     user: "${SOFIBOT_UID:-10001}:${SOFIBOT_GID:-10001}"
     ports:
@@ -28,6 +33,8 @@ services:
     command: ["sofibot", "serve-consultas", "--host", "0.0.0.0", "--port", "8080"]
     env_file:
       - path: .env.consultas
+        required: false
+      - path: ${SOFIBOT_SECRETS_DIR:-/etc/sofibot}/secretos-consultas.env
         required: false
     user: "${SOFIBOT_UID:-10001}:${SOFIBOT_GID:-10001}"
     ports:

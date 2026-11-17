@@ -93,6 +93,7 @@ instrucción**: las aplica el servidor de Sofibot o SQL Server.
 | Base de datos: un login por funcionalidad, que solo lee las tablas Gold o las del catálogo | **Bloqueo real** en SQL Server |
 | Carpeta de instalación con **Claude Code**: `.claude/settings.json` le impide leer `.env` y los datos y ejecutar `sqlcmd`, `docker compose run`, `docker exec`… | **Bloqueo real** en Claude Code |
 | Carpeta de instalación con **Codex** u otros asistentes: `AGENTS.md` e `INSTALAR-CON-IA.md` | **Instrucción**: suelen seguirla, pero no es una barrera |
+| Servidor Linux de producción con las contraseñas en `/etc/sofibot` (solo root), las carpetas de datos solo para el contenedor y Docker solo con `sudo` | **Bloqueo real** del sistema operativo, con cualquier asistente |
 | Siempre: lo que toca contraseñas o la base lo ejecuta una persona | Procedimiento |
 
 Las instrucciones de los conectores (qué conector usar, preguntar si hay duda) son solo
@@ -105,6 +106,27 @@ y enviando los datos a su proveedor. Por eso el paquete de instalación trae `AG
 `CLAUDE.md`, `.claude/settings.json` e `INSTALAR-CON-IA.md`
 ([00 · Instalación con imagen](00-instalacion-con-imagen.md#asistentes-de-ia-y-esta-carpeta)).
 Para consultar datos con IA, la vía es el conector *Sofibot consultas*.
+
+### Recomendación de Datasofi para el servidor de producción
+
+1. **No uséis asistentes de IA (Claude Code, Codex, Copilot…) en el servidor de producción.**
+   Si alguien de sistemas quiere ayuda de una IA para instalar o resolver un problema, que la
+   use en su PC y le pegue solo los comandos y los mensajes de error, nunca contraseñas ni
+   resultados con datos.
+2. **Usad solo la cuenta de empresa** de Claude u OpenAI que hayáis aprobado, nunca una
+   personal: con una cuenta personal, el proveedor puede guardar las conversaciones o usarlas
+   para entrenar sus modelos, según su configuración.
+3. **Convertidlo en una barrera técnica** en Linux: contraseñas en `/etc/sofibot` (solo root),
+   carpetas de datos solo para el contenedor y Docker solo con `sudo`
+   ([00 · Instalación con imagen](00-instalacion-con-imagen.md#producción-en-linux-secretos-fuera-de-la-carpeta)).
+   Así, aunque alguien abra un asistente con su usuario, este no llega ni a las contraseñas,
+   ni a los datos, ni a Docker. Estar en el grupo `docker` equivale a ser administrador del
+   servidor: en producción, nadie de uso diario debería estar en él.
+
+**Si ocurre** (un asistente ha leído `.env` o ha consultado la base por fuera de Sofibot):
+cambiad la contraseña del login afectado (y los tokens que hubiera en el fichero), revisad
+qué se envió en la conversación y avisad al responsable de protección de datos para que
+valore si hay datos personales afectados.
 
 ### Asistentes que escriben informes
 

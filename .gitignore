@@ -13,6 +13,7 @@ dist/
 .env.*
 !.env.example
 !.env.consultas.example
+secretos*.env
 
 # Borradores escritos por la API de informes (docs/10-api-informes.md)
 # (en cualquier carpeta reports/, también la de Contoso; tienen correos de usuarios)

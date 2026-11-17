@@ -28,7 +28,7 @@ comandos de los dos. Tiempo aproximado: 20 minutos, más lo que tarde el DBA en 
 
 | Qué | Para qué |
 |---|---|
-| `sofibot-eqz-<versión>.tar.gz` | El paquete de instalación: `compose.yaml`, plantillas de configuración, `Caddyfile`, el script SQL para el DBA (`sql/crear-login-lectura.sql`), la documentación, `INSTALAR-CON-IA.md` y las reglas para asistentes de IA. **No contiene el código del programa**, que va dentro de la imagen |
+| `sofibot-eqz-<versión>.tar.gz` | El paquete de instalación: `compose.yaml`, plantillas de configuración, `Caddyfile`, el script SQL para el DBA (`sql/crear-login-lectura.sql`), las plantillas de secretos para producción (`secretos.env.example`), la documentación, `INSTALAR-CON-IA.md` y las reglas para asistentes de IA. **No contiene el código del programa**, que va dentro de la imagen |
 | Un usuario de GitHub y un **token de solo lectura** | Descargar la imagen del registro privado de Datasofi (`ghcr.io`). Solo permite descargar |
 
 El `compose.yaml` del paquete apunta a la versión exacta de la imagen por su huella
@@ -131,6 +131,78 @@ docker compose ps
 ✅ **Bien si** `sofibot` aparece `running (healthy)` y `http://localhost:8080` (desde el propio
 equipo) abre Sofibot.
 
+## Producción en Linux: secretos fuera de la carpeta
+
+**Recomendado para el servidor de producción.** Con la instalación anterior, el usuario que
+instala tiene en su carpeta las contraseñas (`.env`) y puede usar Docker. Quien entre con ese
+usuario, o un asistente de IA que trabaje con él, puede leer las contraseñas y llegar a los
+datos por fuera de Sofibot. Estos pasos lo convierten en una barrera del sistema operativo:
+las contraseñas y los datos solo los lee root, y Docker solo se usa con `sudo`, que pide la
+contraseña del administrador.
+
+Cuando Sofibot ya funcione (paso 5), desde `/opt/sofibot`:
+
+**1 · Contraseñas y tokens a `/etc/sofibot`, solo para root:**
+
+```bash
+sudo mkdir -p /etc/sofibot
+sudo chmod 700 /etc/sofibot
+sudo cp secretos.env.example /etc/sofibot/secretos.env
+sudo chmod 600 /etc/sofibot/secretos.env
+sudo nano /etc/sofibot/secretos.env
+```
+
+Poned ahí `SQLSERVER_PASSWORD`, `SOFIBOT_ADMIN_TOKEN` y, si los usáis, `ENTRA_CLIENT_SECRET`,
+`SOFIBOT_VIEWER_PASSWORD` o `SOFIBOT_API_TOKEN`. Después, **dejad esas variables vacías en
+`.env`** (`nano .env`). Lo que hay en `secretos.env` tiene prioridad sobre `.env`.
+
+Con el servicio de consultas, igual con `secretos-consultas.env.example` →
+`/etc/sofibot/secretos-consultas.env` (su `SQLSERVER_PASSWORD`, la del login
+`sofibot_consultas`), y dejad vacía `SQLSERVER_PASSWORD` en `.env.consultas`.
+
+**2 · Las carpetas con datos, solo para el contenedor:**
+
+```bash
+sed -i '/^SOFIBOT_UID=/d;/^SOFIBOT_GID=/d' .env
+mkdir -p consultas
+sudo chown -R 10001:10001 reports output consultas
+sudo chmod 700 output consultas
+```
+
+El contenedor usa su propio usuario (10001): los informes generados (`output/`) y el registro
+de consultas (`consultas/`) dejan de ser legibles para vuestro usuario. `reports/` sigue
+legible (código de los informes y estructura, sin datos), pero ya solo se modifica desde el
+portal o con `sudo`.
+
+**3 · Docker solo con `sudo`:**
+
+```bash
+sudo gpasswd -d $USER docker
+exit
+```
+
+Volved a entrar por `ssh`. Desde ahora, todos los comandos `docker compose …` de las guías
+van con `sudo` delante: `sudo docker compose up -d`, `sudo docker compose run --rm sofibot sofibot config`…
+
+**4 · Comprobar:**
+
+```bash
+sudo docker compose up -d
+sudo docker compose run --rm sofibot sofibot config
+cat /etc/sofibot/secretos.env
+docker ps
+```
+
+✅ **Bien si** `config` termina en `Configuración completa`, y `cat` y `docker ps` (sin `sudo`)
+responden *Permission denied*: vuestro usuario, y cualquier asistente que trabaje con él, ya
+no llega a las contraseñas ni a Docker.
+
+❌ **Si** `docker compose` dice *permission denied* al leer `/etc/sofibot/…` → os habéis dejado
+el `sudo` delante.
+
+En Windows con Docker Desktop, para pruebas, no hace falta: allí la configuración se queda en
+la carpeta.
+
 ---
 
 ## Después de arrancar
@@ -178,6 +250,14 @@ perfil `https` y añadid Sofibot a ese proxy ([08 · HTTPS](08-acceso-https.md))
 
 ## Asistentes de IA y esta carpeta
 
+> **Recomendación de Datasofi: no uséis asistentes de IA (Claude Code, Codex, Copilot…) en el
+> servidor de producción.** Si queréis ayuda de una IA para instalar o resolver un problema,
+> usadla en vuestro PC y pegadle solo los comandos y los mensajes de error, nunca contraseñas
+> ni resultados con datos. Usad siempre la cuenta de empresa de Claude u OpenAI que hayáis
+> aprobado, no una personal: con una cuenta personal, el proveedor puede guardar las
+> conversaciones o usarlas para entrenar sus modelos, según su configuración. Como barrera
+> técnica, seguid [Producción en Linux: secretos fuera de la carpeta](#producción-en-linux-secretos-fuera-de-la-carpeta).
+
 La carpeta de instalación contiene las contraseñas del SQL Server (`.env`, `.env.consultas`)
 y, con Docker, da acceso a la base. Un asistente de IA abierto en ella trabaja con vuestros
 permisos: si nada se lo impide, puede leer `.env` y consultar la base **por fuera de
@@ -198,14 +278,16 @@ Para consultar datos con IA, la vía es el conector **Sofibot consultas** (parte
 *Después de arrancar*): aplica los permisos de cada usuario y registra cada consulta. Las
 protecciones de cada funcionalidad están en [06 · Seguridad](06-seguridad.md).
 
-En Linux, proteged además la configuración para que solo la lea el usuario que gestiona
-Sofibot: `chmod 600 .env` (y `.env.consultas`, cuando lo creéis).
+Estos ficheros son la red de seguridad para pruebas y despistes. En producción, la barrera
+real es la de [Producción en Linux](#producción-en-linux-secretos-fuera-de-la-carpeta): con
+ella, el usuario de trabajo no llega ni a las contraseñas ni a Docker.
 
 ## Qué queda en vuestro equipo
 
 | Carpeta o fichero | Qué es | Copia de seguridad |
 |---|---|---|
-| `.env`, `.env.consultas` | Configuración y contraseñas | Sí, en un gestor de secretos |
+| `.env`, `.env.consultas` | Configuración (y contraseñas, si no usáis `/etc/sofibot`) | Sí, en un gestor de secretos |
+| `/etc/sofibot/` | Contraseñas y tokens en producción Linux | Sí, en un gestor de secretos |
 | `reports/` | Vuestros informes, catálogo, permisos y registros | Sí |
 | `consultas/` | Registro de consultas | Sí |
 | `output/` | Informes generados | No: se regeneran |

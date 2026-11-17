@@ -96,6 +96,11 @@ docker compose version
 
 > No instales el paquete `docker.io` de Debian: no incluye `docker compose`.
 
+> Estar en el grupo `docker` equivale a ser administrador del servidor. Para instalar es
+> cómodo; en producción, al acabar, seguid *Producción en Linux: secretos fuera de la
+> carpeta* ([00 · Instalación con imagen](00-instalacion-con-imagen.md#producción-en-linux-secretos-fuera-de-la-carpeta)):
+> saca a vuestro usuario del grupo y lleva las contraseñas a `/etc/sofibot`.
+
 ---
 
 ## Paso 4 · Descargar Sofibot

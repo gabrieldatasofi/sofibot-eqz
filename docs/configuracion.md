@@ -1,6 +1,9 @@
 # Configuración
 
-Toda la configuración está en el fichero `.env` (plantilla: `.env.example`). Tras
+Toda la configuración está en el fichero `.env` (plantilla: `.env.example`). En producción
+Linux, las contraseñas y tokens van aparte, en `/etc/sofibot/secretos.env` y
+`/etc/sofibot/secretos-consultas.env` (solo root), y tienen prioridad sobre `.env` y
+`.env.consultas` ([00 · Instalación con imagen](00-instalacion-con-imagen.md#producción-en-linux-secretos-fuera-de-la-carpeta)). Tras
 cambiarlo: `docker compose up -d` (recrea el contenedor con los nuevos valores).
 
 Para comprobar qué falta sin mostrar ningún valor: `docker compose run --rm sofibot sofibot config`
