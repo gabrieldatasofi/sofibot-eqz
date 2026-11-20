@@ -26,8 +26,7 @@ y se regeneran automáticamente cada día.
 |---|---|---|
 | 1 | Instalar Docker y descargar Sofibot | PC con Windows: [00 · Probar en Windows](docs/00-prueba-en-windows.md). Servidor: [00 · Instalación en Debian](docs/00-instalacion-debian-paso-a-paso.md) o [01 · Instalación](docs/01-instalacion.md) |
 | 2 | Crear el login de solo lectura en SQL Server con `sql/crear-login-lectura.sql` | [02 · Conexión](docs/02-conexion-sql-server.md) |
-| 3 | Copiar `.env.example` a `.env` y rellenar servidor, base de datos y login | [12 · Arquitectura técnica](docs/12-arquitectura.md) | Sistemas / Datasofi | Piezas, pantallas, identidad, las dos funcionalidades, MCP, carpetas y código |
-| [Configuración](docs/configuracion.md) |
+| 3 | Copiar `.env.example` a `.env` y rellenar servidor, base de datos y login | [Configuración](docs/configuracion.md) |
 | 4 | Comprobar la conexión y obtener el esquema | `docker compose run --rm sofibot sofibot check` y `... sofibot schema` |
 | 5 | Crear los informes y arrancar el portal | [04 · Crear informes](docs/04-crear-informes.md) |
 
