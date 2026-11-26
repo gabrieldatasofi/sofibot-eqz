@@ -30,7 +30,12 @@ Sofibot se puede instalar de dos maneras, según quién lo instale:
 | Actualizar | `git pull` + `docker compose build` + `up -d` | Cambiar la versión de la imagen + `docker compose pull` + `up -d` |
 | Conectores de Claude y Codex | Hay que generar `mcp-server/dist/sofibot-mcp.exe` con `build-exe.ps1` antes de construir | Vienen dentro de la imagen |
 
-Este documento y la guía de Debian describen la forma de desarrollo. La forma de cliente
+Este documento y la guía de Debian describen la forma de desarrollo. El código está en un
+repositorio privado de GitHub (`github.com/gabrieldatasofi/sofibot-eqz`): el servidor lo descarga
+con una clave de despliegue de solo lectura y las personas, con una cuenta a la que
+Datasofi haya dado acceso
+([dar acceso al código](00-instalacion-con-imagen.md#para-datasofi-publicar-una-versión-y-dar-acceso-al-cliente)).
+La forma de cliente
 está en [00 · Instalación con imagen publicada](00-instalacion-con-imagen.md): Datasofi
 publica cada versión con `publicar-imagen.ps1` en GitHub Container Registry (privado) y
 entrega un paquete con un `compose.yaml` que descarga esa imagen fijada por su huella

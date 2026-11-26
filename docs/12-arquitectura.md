@@ -147,7 +147,8 @@ Python.
 
 Dos formas, según quién instala ([01 · Instalación](01-instalacion.md#dos-formas-de-instalar)):
 
-- **Desarrollo** (hoy): `git clone` + `docker compose build`. El código está en el servidor.
+- **Desarrollo** (hoy): `git clone` del repositorio privado `gabrieldatasofi/sofibot-eqz` (con una
+  clave de despliegue de solo lectura) + `docker compose build`. El código está en el servidor.
 - **Cliente**: `docker compose pull` de una imagen versionada y fijada por huella, que
   Datasofi publica en GitHub Container Registry con `publicar-imagen.ps1` (tras pasar los
   tests dentro de la imagen), con el `.exe` de los conectores dentro. El cliente recibe un

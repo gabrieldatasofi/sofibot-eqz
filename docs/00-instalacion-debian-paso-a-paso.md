@@ -105,12 +105,44 @@ docker compose version
 
 ## Paso 4 · Descargar Sofibot
 
-Descarga el código en `/opt/sofibot`:
+El repositorio es **privado**. El servidor lo descarga con una **clave de despliegue**
+(*deploy key*): una clave SSH de este servidor que Datasofi da de alta en el repositorio con
+permiso de **solo lectura**. No depende de la cuenta de ninguna persona y se puede retirar
+en cualquier momento.
+
+**4.1 · Crear la clave en el servidor** (una vez):
+
+```bash
+ssh-keygen -t ed25519 -N "" -C "sofibot-$(hostname)" -f ~/.ssh/sofibot_deploy
+cat ~/.ssh/sofibot_deploy.pub
+```
+
+Envía a Datasofi **solo** la línea que muestra el `cat` (empieza por `ssh-ed25519`). Es la
+parte pública. El fichero `~/.ssh/sofibot_deploy` (sin `.pub`) es la privada: no sale del
+servidor.
+
+**4.2 · Esperar a que Datasofi la dé de alta** en el repositorio (*Settings → Deploy keys →
+Add deploy key*, sin marcar *Allow write access*).
+
+**4.3 · Indicar a Git que use esa clave para GitHub y descargar:**
+
+```bash
+cat >> ~/.ssh/config <<'EOF'
+Host github.com
+  IdentityFile ~/.ssh/sofibot_deploy
+  IdentitiesOnly yes
+EOF
+chmod 600 ~/.ssh/config
+ssh -T git@github.com
+```
+
+✅ **Bien si** responde `Hi gabrieldatasofi/sofibot-eqz! You've successfully authenticated…`
+(la primera vez pregunta si confías en `github.com`: responde `yes`).
 
 ```bash
 sudo mkdir -p /opt/sofibot
 sudo chown $USER:$USER /opt/sofibot
-git clone https://github.com/gabrieldatasofi/sofibot-eqz.git /opt/sofibot
+git clone git@github.com:gabrieldatasofi/sofibot-eqz.git /opt/sofibot
 cd /opt/sofibot
 ls
 ```
@@ -118,8 +150,15 @@ ls
 ✅ **Bien si** `ls` muestra `README.md`, `compose.yaml`, `docs`, `sql`, `src`…
 
 ❌ **Si no**:
-- `Could not resolve host: github.com` o `timed out` → el servidor no sale a internet, o
-  sale por un proxy de la empresa; pregunta a sistemas.
+- `Permission denied (publickey)` o `Repository not found` → la clave aún no está dada de
+  alta, o se envió otra: comprueba con Datasofi que la línea coincide con
+  `cat ~/.ssh/sofibot_deploy.pub`.
+- `Connection timed out` en el puerto 22 → el cortafuegos de la empresa bloquea SSH hacia
+  internet. Pide a sistemas que permitan `github.com:22` o, si no es posible, cambia en
+  `~/.ssh/config` el bloque por `Host github.com` / `Hostname ssh.github.com` / `Port 443`
+  (más las dos líneas de la clave).
+- `Could not resolve host: github.com` → el servidor no sale a internet, o sale por un
+  proxy de la empresa; pregunta a sistemas.
 - `destination path '/opt/sofibot' already exists and is not an empty directory` → ya lo
   habías descargado: entra con `cd /opt/sofibot` y sigue.
 

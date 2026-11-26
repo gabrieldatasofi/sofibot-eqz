@@ -325,10 +325,21 @@ genera `dist-instalacion/sofibot-eqz-<versión>.tar.gz`, que es lo que se entreg
 
 1. Una cuenta de GitHub para el cliente o para entregas (por ejemplo `datasofi-entregas`),
    no la de una persona de Datasofi.
-2. En GitHub, el paquete `sofibot-eqz` (perfil → *Packages*) → *Package settings* →
-   *Manage access* → añadir esa cuenta con rol **Read**. El paquete es privado: hereda la
-   visibilidad del repositorio.
+2. En GitHub, el paquete `sofibot-eqz` (perfil → *Packages*) →
+   *Package settings* → *Manage access* → añadir esa cuenta con rol **Read**. El paquete
+   es privado: hereda la visibilidad del repositorio.
 3. Con esa cuenta: *Settings → Developer settings → Personal access tokens → Tokens
    (classic)* → nuevo token solo con **`read:packages`**, con caducidad. A día de hoy, los
    tokens *fine-grained* de GitHub no sirven para el registro de imágenes.
 4. Entregar el usuario y el token por un canal seguro, nunca por correo, junto con el paquete.
+
+**Dar acceso al código** (repositorio privado `github.com/gabrieldatasofi/sofibot-eqz`):
+
+| Quién | Cómo | Permiso |
+|---|---|---|
+| Quien desarrolla con Datasofi | Repositorio → *Settings → Collaborators → Add people* | **Write** (push, ramas, pull requests). Si también publica la imagen: en el paquete, *Package settings → Manage access* con rol **Write** |
+| Un servidor con la instalación de desarrollo (`git clone`) | Repositorio → *Settings → Deploy keys → Add deploy key* con la clave pública del servidor ([guía de Debian, paso 4](00-instalacion-debian-paso-a-paso.md#paso-4--descargar-sofibot)) | Solo lectura: no marcar *Allow write access* |
+| Quien solo instala y usa Sofibot | No necesita el código: imagen publicada y token de lectura (arriba) | — |
+
+Retirar el acceso es borrar al colaborador o la clave de despliegue. Las contraseñas y
+tokens de cada instalación no están en el repositorio, así que no hay que cambiarlas.

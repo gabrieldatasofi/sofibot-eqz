@@ -72,6 +72,9 @@ docker compose version
 
 ## Paso 2 · Descargar Sofibot
 
+El repositorio es **privado**: necesitas una cuenta de GitHub a la que Datasofi haya dado
+acceso (te llega una invitación por correo; acéptala antes de seguir).
+
 **Opción A, con Git** (si está instalado: `git --version` responde algo):
 
 ```powershell
@@ -80,9 +83,13 @@ git clone https://github.com/gabrieldatasofi/sofibot-eqz.git sofibot
 cd sofibot
 ```
 
-**Opción B, sin Git:** abre https://github.com/gabrieldatasofi/sofibot-eqz, pulsa el botón
-verde **Code** → **Download ZIP**, descomprímelo en tu carpeta de usuario y renombra la
-carpeta a `sofibot`. Después, en PowerShell:
+La primera vez, Git para Windows abre el navegador para iniciar sesión en GitHub: entra con
+la cuenta invitada y autoriza. Después ya no lo vuelve a pedir.
+
+**Opción B, sin Git:** inicia sesión en GitHub con esa cuenta, abre
+https://github.com/gabrieldatasofi/sofibot-eqz, pulsa el botón verde **Code** → **Download ZIP**,
+descomprímelo en tu carpeta de usuario y renombra la carpeta a `sofibot`. Después, en
+PowerShell:
 
 ```powershell
 cd $HOME\sofibot
