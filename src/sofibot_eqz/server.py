@@ -77,11 +77,20 @@ def scheduler(times: list[tuple[int, int]]) -> None:
 async def lifespan(_app):
     sign_in = auth.check_settings()
     log.info("Portal sign-in: %s", sign_in)
-    if sign_in == "entra":
+    if sign_in in auth.PER_USER:
         try:
             access.read()
         except access.PermissionsError as exc:
             log.warning("Permissions: %s. Signed-in users see no reports until it is fixed.", exc)
+        try:
+            accounts = access.read_local_accounts()
+        except access.PermissionsError as exc:
+            accounts = {}
+            log.warning("Local accounts: %s. No local account can sign in until it is fixed.", exc)
+        if accounts:
+            log.info("Local accounts that can sign in without Entra ID: %s", ", ".join(sorted(accounts)))
+        elif sign_in == "local":
+            log.warning("SOFIBOT_AUTH=local but there is no local account: create one with  sofibot local-account add NAME")
     times = schedule_times()
     if times:
         threading.Thread(target=scheduler, args=(times,), daemon=True, name="build-schedule").start()
@@ -98,7 +107,7 @@ async def viewer_sign_in(request: Request, call_next):
     path = request.url.path
     if path == "/health" or path.startswith(("/api/admin/", "/api/code/")):  # these APIs have their own tokens
         return await call_next(request)
-    if path in ("/", "/conexion.json") and auth.mode() == "entra":  # landing page; ids for the connector installer
+    if path in ("/", "/conexion.json") and auth.per_user():  # landing page; ids for the connector installer
         return await call_next(request)
     sign_in = auth.mode()
     if sign_in == "basic":
@@ -110,7 +119,9 @@ async def viewer_sign_in(request: Request, call_next):
             supplied = b""
         if not os.environ.get("SOFIBOT_VIEWER_PASSWORD") or not secrets.compare_digest(supplied, expected.encode()):
             return JSONResponse({"detail": "Sign-in required"}, 401, {"WWW-Authenticate": 'Basic realm="Sofibot"'})
-    elif sign_in == "entra" and not path.startswith("/auth/") and not request.session.get("user"):
+    elif sign_in in auth.PER_USER and not path.startswith("/auth/") and not auth.session_valid(request):
+        # No session, or one that no longer counts (local account removed or its password changed).
+        request.session.pop("user", None)
         if path.startswith("/api/"):
             return JSONResponse({"detail": "Sign-in required"}, 401)
         target = path + (f"?{request.url.query}" if request.url.query else "")

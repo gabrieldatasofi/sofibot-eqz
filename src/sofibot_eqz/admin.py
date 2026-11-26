@@ -39,8 +39,8 @@ FUNCTION_ROLES = {ROLE_AUTHOR: "Escribir informes con un asistente de IA (funcio
 
 
 def administrator(request: Request) -> identity.Identity:
-    if auth.mode() != "entra":
-        raise HTTPException(404, "La administración necesita el inicio de sesión con Entra ID (SOFIBOT_AUTH=entra).")
+    if not auth.per_user():
+        raise HTTPException(404, "La administración necesita inicio de sesión por persona (SOFIBOT_AUTH=entra o local).")
     who = ui.user(request)
     if who is None or ROLE_ADMIN not in who.roles:
         raise HTTPException(403, f"Tu usuario no tiene el rol de administración ({ROLE_ADMIN}).")
@@ -163,7 +163,12 @@ conexión y su propio login, en .env.consultas.</p>
 
 def entra_section(who: identity.Identity) -> str:
     env = os.environ
-    rows = [("Inicio de sesión del portal", state(auth.mode() == "entra", auth.mode())),
+    if auth.mode() == "local":
+        roles = "".join(f"<tr><td><code>{escape(r)}</code></td><td>{escape(d)}</td></tr>" for r, d in FUNCTION_ROLES.items())
+        return f"""<h2 id="entra">Inicio de sesión</h2>
+<p>{state(None, "Solo cuentas locales (SOFIBOT_AUTH=local)")}: sin Microsoft Entra ID. Tus roles: {escape(", ".join(who.roles) or "(ninguno)")}.</p>
+{local_section()}<h3>Roles de las funcionalidades</h3><table><tr><th>Rol</th><th>Para</th></tr>{roles}</table>"""
+    rows = [("Inicio de sesión del portal", state(auth.per_user(), auth.mode())),
             ("Inquilino (tenant)", escape(masked(env.get("ENTRA_TENANT_ID", "")))),
             ("Aplicación (cliente)", escape(masked(env.get("ENTRA_CLIENT_ID", "")))),
             ("Secreto de cliente", state(bool(env.get("ENTRA_CLIENT_SECRET")), "Configurado" if env.get("ENTRA_CLIENT_SECRET") else "Falta")),
@@ -180,9 +185,28 @@ def entra_section(who: identity.Identity) -> str:
     roles = "".join(f"<tr><td><code>{escape(r)}</code></td><td>{escape(d)}</td></tr>" for r, d in FUNCTION_ROLES.items())
     return f"""<h2 id="entra">Microsoft Entra ID</h2>
 <table>{"".join(f"<tr><th>{escape(k)}</th><td>{v}</td></tr>" for k, v in rows)}</table>
+{local_section()}
 <p class="meta">Entra ID solo valida el inicio de sesión. Tus roles en Sofibot: {escape(mine)}. Los roles se
 asignan en <a href="/admin/usuarios">Usuarios</a>.</p>
 <h3>Roles de las funcionalidades</h3><table><tr><th>Rol</th><th>Para</th></tr>{roles}</table>"""
+
+
+def local_section() -> str:
+    """Local accounts: who can sign in without Entra ID. Never shows a hash or a secret."""
+    try:
+        accounts, problem = access.read_local_accounts(), ""
+    except access.PermissionsError as exc:
+        accounts, problem = {}, str(exc)
+    names = ", ".join(sorted(accounts)) or "ninguna"
+    rows = [("Cuentas locales", state(None if accounts else True, names) if not problem else state(False, problem)),
+            ("Tokens para sus conectores (SOFIBOT_LOCAL_SECRET)",
+             state(True, f"Configurado · duran {identity.token_days()} días") if identity.local_secret()
+             else state(None, "No configurado: las cuentas locales no pueden usar conectores ni Consultas"))]
+    return f"""<h3 id="locales">Cuentas locales (sin Entra ID)</h3>
+<table>{"".join(f"<tr><th>{escape(k)}</th><td>{v}</td></tr>" for k, v in rows)}</table>
+<p class="meta">Entran con usuario y contraseña, sin pasar por Microsoft: sirven de acceso de emergencia. Se gestionan
+en el servidor con <code>sofibot local-account</code> (docs/09-inicio-sesion-entra.md). Cada entrada queda en el
+registro del portal; tras 5 contraseñas erróneas en 15 minutos el acceso se bloquea un rato.</p>"""
 
 
 def functionality_one() -> str:
@@ -195,7 +219,7 @@ def functionality_one() -> str:
     events = "".join(f"<tr><td>{escape(e['at'][:16].replace('T', ' '))}</td><td>{escape(e['who'])}</td>"
                      f"<td>{escape(e['operation'])}</td><td>{escape(e['slug'])}</td></tr>" for e in drafts.events(10))
     return f"""<h2 id="informes">Funcionalidad 1 · crear informes</h2>
-<table><tr><th>API de informes (/api/code)</th><td>{state(mode == "entra", mode)}</td></tr>
+<table><tr><th>API de informes (/api/code)</th><td>{state(mode in drafts.PER_USER_MODES, mode)}</td></tr>
 <tr><th>Informes publicados</th><td>{len(projects.projects())} proyectos, {len(projects.built())} generados</td></tr>
 <tr><th>Borradores</th><td>{" · ".join(f"{pages.STATUS[k]}: {v}" for k, v in counts.items())}</td></tr>
 <tr><th>Builds programados</th><td>{escape(os.environ.get("SOFIBOT_BUILD_SCHEDULE", "") or "ninguno")}</td></tr>
@@ -423,6 +447,13 @@ def users_page(request: Request, mensaje: str = ""):
             summary += f" (sin tablas en Permisos: {', '.join(unknown)})"
         rows.append(f"<tr><td>{name}</td>{cells}<td class='meta'>{escape(summary) or '—'}</td></tr>")
     functions = "; ".join(f"<code>{escape(r)}</code>: {escape(d)}" for r, d in FUNCTION_ROLES.items())
+    accounts = access.load_local_accounts()
+    local_rows = "".join(f"<tr><td><b>{escape(name)}</b> <span class='tag'>cuenta local</span></td>"
+                         f"<td>{escape(', '.join('todas las tablas' if r == access.ALL else r for r in a['roles']))}</td></tr>"
+                         for name, a in sorted(accounts.items()))
+    local_html = (f"""<h2>Cuentas locales</h2><p class="meta">Entran con usuario y contraseña, sin Microsoft. Sus roles van
+con la cuenta y se cambian en el servidor con <code>sofibot local-account</code>, no aquí.</p>
+<table><tr><th>Usuario</th><th>Roles</th></tr>{local_rows}</table>""" if accounts else "")
     body = f"""<h1>Usuarios</h1>{ui.notice(mensaje) if mensaje else ""}{ui.notice(problem) if problem else ""}
 <p>Microsoft Entra ID solo valida el inicio de sesión: dice quién es cada persona. Lo que puede hacer en Sofibot
 se decide aquí. Cada fila es una persona, por su <b>correo de Microsoft</b> (con el que inicia sesión), y sus roles:</p>
@@ -434,7 +465,7 @@ sin volver a iniciar sesión; el fichero anterior se guarda.</p>
 <div class="scroll"><table><tr><th>Usuario</th>{head}<th>Tablas que ve</th></tr>{"".join(rows)}</table></div>
 <input type="hidden" name="count" value="{len(users) + 1}">
 <div class="actions"><button class="primary">Guardar usuarios</button>
-<a class="button" href="/admin">Volver</a></div></form>"""
+<a class="button" href="/admin">Volver</a></div></form>{local_html}"""
     return ui.page(request, "Usuarios", body, active="admin")
 
 
@@ -458,7 +489,7 @@ async def save_users(request: Request):
             problems.append(f"{email}: roles no válidos {', '.join(bad)}")
             continue
         users[email] = roles
-    if ROLE_ADMIN not in users.get(who.email.casefold(), []):
+    if who.via == "entra" and ROLE_ADMIN not in users.get(who.email.casefold(), []):
         problems.append(f"No puedes quitarte a ti mismo el rol {ROLE_ADMIN}: que lo haga otro administrador")
     if problems:
         return RedirectResponse(f"/admin/usuarios?mensaje={quote('No se ha guardado. ' + '; '.join(problems))}", 303)

@@ -51,11 +51,13 @@ class DraftError(Exception):
         self.status = status
 
 
-API_MODES = ("off", "entra", "token")
+API_MODES = ("off", "entra", "local", "token")
+PER_USER_MODES = ("entra", "local")
 
 
 def api_mode(env=os.environ) -> str:
-    """SOFIBOT_CODE_API: off (default), entra (each author with their Microsoft account) or token
+    """SOFIBOT_CODE_API: off (default), entra or local (each author with their own token: from
+    Microsoft or, for a local account, from Sofibot; both are accepted in either mode) or token
     (one shared SOFIBOT_API_TOKEN, for tests: nobody knows who did what). Unset with a token: token."""
     value = env.get("SOFIBOT_CODE_API", "").strip().lower()
     if not value:

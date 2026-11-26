@@ -26,7 +26,7 @@ STATUS = {"draft": "En edición", "submitted": "Enviado a revisión", "published
 
 
 def reviewer(request: Request) -> tuple[Identity, set[str] | None]:
-    if auth.mode() != "entra":
+    if not auth.per_user():
         raise HTTPException(404, "Not found")
     user = from_session(auth.current_user(request) or {})
     if ROLE_REVIEWER not in user.roles:

@@ -29,6 +29,9 @@ Además, Sofibot:
   si alguien que los conocía deja de necesitarlos.
 - `ENTRA_CLIENT_SECRET` (inicio de sesión con Entra ID) solo está en `.env`, caduca y se
   renueva en Entra ID ([09 · Inicio de sesión con Entra ID](09-inicio-sesion-entra.md)).
+- `SOFIBOT_LOCAL_SECRET` (tokens de las cuentas locales) va en `.env` y `.env.consultas` con
+  el mismo valor. Quien lo conozca puede fabricar tokens para cualquier cuenta local: se trata
+  como `SOFIBOT_ADMIN_TOKEN`. Cambiarlo anula todos los tokens de las cuentas locales.
 
 ## Usuarios del portal
 
@@ -51,6 +54,24 @@ Con `SOFIBOT_AUTH=entra`:
 
 Un informe se genera una vez y todos los que tienen acceso ven los mismos datos: no se
 filtra por usuario dentro de un informe.
+
+### Cuentas locales
+
+Las cuentas locales ([09 · Cuentas locales](09-inicio-sesion-entra.md#cuentas-locales-sin-entra-id))
+entran con usuario y contraseña, **sin la MFA ni el acceso condicional de Entra ID**. Son el
+acceso de emergencia que no depende de Microsoft, y por eso mismo hay que cuidarlas:
+
+- pocas: normalmente una, `sofibot.admin`, y solo con los roles que necesite;
+- contraseña aleatoria (`--generate`), guardada en el gestor de contraseñas de la empresa y
+  conocida por pocas personas; cambiarla (`sofibot local-account passwd`) cuando alguien que
+  la conocía deja de necesitarla. Cada instalación tiene la suya: no se comparte entre clientes
+  ni se sube a git;
+- Sofibot solo guarda su *hash* (scrypt), bloquea temporalmente tras 5 fallos en 15 minutos y
+  registra en el log cada entrada, cada fallo y cada token emitido;
+- sus tokens personales (para Claude o Codex) caducan (`SOFIBOT_LOCAL_TOKEN_DAYS`) y se anulan
+  al cambiar la contraseña o con `sofibot local-account revoke`;
+- si la empresa no quiere ningún acceso fuera de Entra ID, basta con no crear cuentas locales
+  (o borrarlas con `sofibot local-account remove`): sin cuentas, el formulario no aparece.
 - Si el login se ve comprometido: cambiar la contraseña con `sql/crear-login-lectura.sql`
   (es re-ejecutable) y actualizar `.env`.
 

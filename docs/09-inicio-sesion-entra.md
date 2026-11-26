@@ -43,6 +43,9 @@ tiene `gold.costes_producto`. Ana (*Direccion*) ve los dos.
   persona tenga que volver a iniciar sesión.
 - Sofibot no guarda contraseñas de los usuarios ni tiene acceso a su correo ni a otros
   datos de Microsoft 365. Solo recibe su nombre y su correo.
+- Además, puede haber **cuentas locales** con usuario y contraseña, que no dependen de Entra
+  ID: el administrador de emergencia o, en una instalación sin Entra ID, todos los usuarios.
+  Ver [Cuentas locales](#cuentas-locales-sin-entra-id).
 
 Reparto del trabajo:
 
@@ -290,6 +293,81 @@ la página pide volver a entrar (sin contraseña si la sesión de Microsoft sigu
 
 ---
 
+## Cuentas locales (sin Entra ID)
+
+Una **cuenta local** entra en Sofibot con usuario y contraseña, sin pasar por Microsoft. Sirve
+para dos cosas:
+
+- **administrador de emergencia**: con `SOFIBOT_AUTH=entra`, si existe alguna cuenta local, la
+  página de entrada muestra *Iniciar sesión con Microsoft* y, debajo, el formulario de la cuenta
+  local. Así hay al menos un acceso que no depende de Entra ID (caída de Microsoft, secreto
+  caducado, aplicación mal configurada);
+- **instalaciones sin Entra ID**, por ejemplo de pruebas: con `SOFIBOT_AUTH=local` solo entran
+  cuentas locales.
+
+Cada cuenta lleva sus propios roles (los mismos roles de funcionalidad y de datos; además, `*`
+da todas las tablas Gold). Están en `acceso/cuentas-locales.json`, que solo guarda un *hash*
+de la contraseña (scrypt), nunca la contraseña. No se gestionan en Administración → Usuarios
+(que solo las muestra) sino en el servidor, con el comando `sofibot local-account`, que debe
+ejecutar una persona (nunca un asistente de IA: muestra o pide contraseñas).
+
+### Crear el administrador de emergencia
+
+```bash
+docker compose run --rm sofibot sofibot local-account add sofibot.admin --generate
+```
+
+Crea `sofibot.admin` con todos los roles y todas las tablas, y muestra **una sola vez** una
+contraseña aleatoria: guardadla en el gestor de contraseñas de la empresa. Sin `--generate`,
+pide escribirla (12 caracteres o más). Con `--roles` se dan otros roles, por ejemplo
+`--roles Sofibot.Consultas Ventas`. Cada instalación crea su propia cuenta y su propia
+contraseña: el fichero no va en git (`.gitignore`) ni en el paquete de instalación.
+
+| Tarea | Comando (en la carpeta de Sofibot) |
+|---|---|
+| Ver las cuentas y sus roles | `docker compose run --rm sofibot sofibot local-account` |
+| Cambiar la contraseña | `... sofibot local-account passwd sofibot.admin` (o con `--generate`) |
+| Cerrar sus sesiones y anular sus tokens, sin cambiar la contraseña | `... sofibot local-account revoke sofibot.admin` |
+| Cambiar sus roles | `... sofibot local-account roles sofibot.admin Sofibot.Admin "*"` |
+| Borrarla | `... sofibot local-account remove sofibot.admin` |
+
+Los cambios se aplican al momento, sin reiniciar. Cambiar la contraseña (o `revoke`) cierra
+las sesiones abiertas de la cuenta y anula todos sus tokens.
+
+### Conectores de Claude y Codex y Consultas con una cuenta local
+
+Los conectores y el servicio de consultas no pueden pedir un token a Microsoft para una cuenta
+local, así que Sofibot emite los suyos, firmados con `SOFIBOT_LOCAL_SECRET`:
+
+1. En `.env` **y** en `.env.consultas`, el mismo valor (32 caracteres o más; en producción
+   Linux, en `secretos.env` y `secretos-consultas.env`):
+   ```bash
+   SOFIBOT_LOCAL_SECRET=<python -c "import secrets; print(secrets.token_urlsafe(48))">
+   ```
+   Para la API de informes, `SOFIBOT_CODE_API=entra` o `local` (aceptan los dos tipos de token).
+2. La persona entra con la cuenta local, abre **Conectar tu IA → Generar token personal** y
+   copia la configuración que se muestra: es la de siempre, con `SOFIBOT_API_TOKEN=<su token>`
+   en lugar de los datos de Microsoft. El conector automático (`sofibot-mcp.exe` con doble clic)
+   solo configura el acceso con Microsoft; con una cuenta local se usa esta configuración.
+3. El token dura `SOFIBOT_LOCAL_TOKEN_DAYS` días (30 por defecto); después se genera otro en la
+   misma página. Sofibot no lo guarda. Da a la IA los permisos de la cuenta: se guarda como una
+   contraseña.
+
+La página **Consultas** del portal también funciona con una cuenta local (el portal genera
+un token de 15 minutos en cada consulta), siempre que los dos servicios tengan el secreto.
+
+### Protección
+
+- Tras 5 contraseñas erróneas en 15 minutos, para un mismo usuario o una misma dirección,
+  el formulario rechaza los intentos durante un rato (también con la contraseña correcta).
+- Cada entrada, cada fallo y cada bloqueo quedan en el log (`docker compose logs sofibot`,
+  `Signed in with a local account` / `Local sign-in failed`), y cada token personal emitido
+  (`Personal token issued`).
+- Administración muestra qué cuentas locales existen y si los tokens están configurados.
+- Una cuenta local no pasa por la MFA ni el acceso condicional de Entra ID: usad una contraseña
+  larga y aleatoria, guardada en el gestor de contraseñas, y pocas cuentas. Ver
+  [06 · Seguridad](06-seguridad.md#cuentas-locales).
+
 ## Operación
 
 | Tarea | Dónde |
@@ -300,6 +378,7 @@ la página pide volver a entrar (sin contraseña si la sesión de Microsoft sigu
 | Informe nuevo | Nada, si sus tablas ya están en algún rol. Comprobar con `sofibot permissions` quién lo ve |
 | Tabla Gold nueva | Añadirla a los roles que deben verla en Permisos por tabla |
 | Primer administrador, o recuperar el acceso si nadie es administrador | `docker compose run --rm sofibot sofibot users add <correo> Sofibot.Admin` |
+| Administrador de emergencia, sin Entra ID | `docker compose run --rm sofibot sofibot local-account add sofibot.admin --generate` ([Cuentas locales](#cuentas-locales-sin-entra-id)) |
 | Renovar el secreto (antes de que caduque) | Entra ID → Certificados y secretos → nuevo secreto; cambiar `ENTRA_CLIENT_SECRET` en `.env`; `docker compose up -d`; borrar el secreto antiguo en Entra ID |
 | Ver quién entra | `docker compose logs sofibot \| grep "Signed in"`: cada inicio de sesión queda registrado con el correo y los roles |
 
@@ -324,4 +403,6 @@ Las APIs de las funcionalidades (`/api/code`, `/api/query`) usan Entra ID: ver
 | Nadie puede abrir Administración | Nadie tiene `Sofibot.Admin`: `sofibot users add <correo> Sofibot.Admin` en el servidor |
 | Las APIs responden 401 `Invalid token: Audience doesn't match` | El cliente pide el token para otra aplicación: el ámbito debe ser `api://<id. de cliente de Sofibot>/access_as_user` |
 | Las APIs responden 403 `does not have the Sofibot.… role` | Falta darle a la persona el rol de esa funcionalidad en Administración → Usuarios |
+| Cuenta local: "Demasiados intentos fallidos" | 5 contraseñas erróneas en 15 minutos: esperar. Si no se recuerda, `sofibot local-account passwd <usuario>` en el servidor |
+| El conector de una cuenta local responde `Invalid token` | El token caducó, se cambió la contraseña o falta `SOFIBOT_LOCAL_SECRET` (en `.env.consultas` también): generar otro en Conectar tu IA |
 | Pide iniciar sesión otra vez tras reiniciar Sofibot | Normal: las sesiones se cierran al reiniciar. Con Microsoft ya iniciado, vuelve a entrar sin escribir la contraseña |

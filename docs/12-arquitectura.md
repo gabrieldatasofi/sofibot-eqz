@@ -56,6 +56,11 @@ por tabla** (`acceso/permisos.json`).
   sesión es una cookie firmada con nombre, correo y roles.
 - **APIs** (`/api/code`, `/api/query`): un token de acceso de Entra ID del usuario
   (`identity.py`): de este inquilino, para esta aplicación, de una persona y sin caducar.
+- **Cuentas locales** (`acceso/cuentas-locales.json`, `sofibot local-account`): usuario y
+  contraseña (hash scrypt), con sus propios roles; el administrador de emergencia o, con
+  `SOFIBOT_AUTH=local`, una instalación sin Entra ID. Para sus conectores y para Consultas,
+  Sofibot emite tokens propios (HS256 con `SOFIBOT_LOCAL_SECRET`, compartido por el portal y
+  el servicio de consultas), válidos mientras la cuenta no cambie de contraseña.
 - **Entra ID solo valida el inicio de sesión** (quién es). Los roles los da Sofibot, por
   correo, en `acceso/usuarios.json` (editable en Administración → Usuarios; el primer
   administrador, con `sofibot users add`). Los roles que lleve el token de Entra se ignoran.

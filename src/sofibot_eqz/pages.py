@@ -1,27 +1,32 @@
 """Portal pages for people: landing, Explore Sofibot, reports, queries and "connect your AI".
 
-- /            landing: sign in with Microsoft (Entra ID); without Entra ID, straight to /explore
+- /            landing: sign in (Entra ID or local account); without per-user sign-in, straight to /explore
 - /explore     the two functionalities, as the user's roles allow
 - /informes    functionality 1: published reports the user may see (theirs marked) and their drafts
 - /consultas   functionality 2: a query form. The portal does not query the database: it forwards
                the user's request, with the user's own token, to the query service (consultas/)
-- /conectar    how to connect Claude or Codex to the two MCP servers, with a download
+- /conectar    how to connect Claude or Codex to the two MCP servers, with a download; for a
+               local account, also its personal token (the connectors cannot sign in with Microsoft)
 """
 from datetime import datetime
 from html import escape
 import io
 import json
+import logging
 import os
 import re
+import secrets
+from urllib.parse import parse_qs
 import zipfile
 
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 
-from . import access, auth, config, drafts, projects, ui
+from . import access, auth, config, drafts, identity, projects, ui
 from .formatting import display_value
 from .identity import ROLE_AUTHOR, ROLE_QUERY, ROLE_REVIEWER
 
+log = logging.getLogger("sofibot")
 router = APIRouter()
 MCP_FILES = ["LEEME.md", "requirements.txt", "sofibot_entra.py", "sofibot_informes_mcp.py", "sofibot_consultas_mcp.py",
              "codigo_del_programa.py", "sofibot_instalar.py", "build-exe.ps1"]
@@ -37,8 +42,11 @@ def query_url() -> str:
 
 @router.get("/", response_class=HTMLResponse)
 def landing(request: Request):
-    if auth.mode() != "entra" or request.session.get("user"):
+    if not auth.per_user() or request.session.get("user"):
         return RedirectResponse("/explore", 302)
+    if auth.mode() == "local":
+        return HTMLResponse(LANDING.replace("Iniciar sesión con Microsoft", "Iniciar sesión")
+                            .replace("Usa tu cuenta de la empresa.", "Con tu usuario de Sofibot."))
     return HTMLResponse(LANDING)
 
 
@@ -170,10 +178,13 @@ def queries_page(request: Request):
     if not query_url():
         return show("El servicio de consultas no está activado en esta instalación (docs/11-consultas.md).")
     if who is None:
-        return show("Las consultas necesitan el inicio de sesión con Microsoft Entra ID.")
+        return show("Las consultas necesitan que cada persona inicie sesión (Microsoft Entra ID o cuenta local).")
     if ROLE_QUERY not in who.roles:
         return show("Tu usuario no tiene el rol de consultas (Sofibot.Consultas). Pídelo a un administrador de Sofibot.")
     token = auth.api_token(request)
+    if token is None and who.via == "local":
+        return show("Las consultas con una cuenta local necesitan SOFIBOT_LOCAL_SECRET en el portal y en el servicio "
+                    "de consultas. Avisa a sistemas (docs/09-inicio-sesion-entra.md).")
     if token is None:
         return show("Tu sesión para consultas ha caducado.",
                     '<div class="actions"><a class="button primary" href="/auth/login?next=/consultas">Volver a entrar</a></div>')
@@ -284,13 +295,18 @@ def exe_file():
     return path if path.is_file() else None
 
 
-def snippets(name: str, mode: str, ai: str, url: str | None = None, exe: bool = True) -> dict[str, str]:
-    """Configuration for Claude Code, Claude Desktop and Codex. mode: informes | consultas."""
+def snippets(name: str, mode: str, ai: str, url: str | None = None, exe: bool = True,
+             token: str | None = None) -> dict[str, str]:
+    """Configuration for Claude Code, Claude Desktop and Codex. mode: informes | consultas.
+
+    With a local account's token, the connector sends it instead of signing in with Microsoft."""
     if exe:
         command, args = rf"{FOLDER}\sofibot-mcp.exe", [mode]
     else:
         command, args = rf"{FOLDER}\.venv\Scripts\python.exe", [rf"{FOLDER}\sofibot_{mode}_mcp.py"]
     env = {**mcp_settings(), "SOFIBOT_AI": ai}
+    if token:
+        env = {"SOFIBOT_URL": env["SOFIBOT_URL"], "SOFIBOT_API_TOKEN": token, "SOFIBOT_AI": ai}
     if url:
         env["SOFIBOT_URL"] = url
     claude = {"mcpServers": {name: {"command": command, "args": args, "env": env}}}
@@ -309,7 +325,7 @@ def connection_settings() -> dict:
     url = os.environ.get("SOFIBOT_PUBLIC_URL", "").strip().rstrip("/")
     return {"url": url, "tenant_id": os.environ.get("ENTRA_TENANT_ID", "").strip(),
             "client_id": os.environ.get("ENTRA_CLIENT_ID", "").strip(),
-            "informes": drafts.api_mode() == "entra", "consultas": bool(query_url()),
+            "informes": drafts.api_mode() in drafts.PER_USER_MODES, "consultas": bool(query_url()),
             "query_url": os.environ.get("SOFIBOT_QUERY_PUBLIC_URL", "").strip().rstrip("/") or url}
 
 
@@ -344,7 +360,16 @@ def connect_page(request: Request):
     ais = "".join(f'<article class="card"><h3>{escape(name)}</h3><p>{escape(text)}</p>'
                   f'<div class="actions"><a class="button" href="{escape(link)}" target="_blank" rel="noopener">'
                   f'Cómo instalarlo</a></div></article>' for name, link, text in AIS)
-    if exe:
+    local = who is not None and who.via == "local"
+    if local:
+        automatic = f"""<h2>2 · Conectar con tu token personal</h2>
+<p>Has entrado con una cuenta local de Sofibot, sin Microsoft: los conectores se identifican con un <b>token personal</b>
+en lugar de iniciar sesión con Microsoft. Genera uno y copia la configuración que se muestra.</p>
+<form method="post" action="/conectar/token"><input type="hidden" name="csrf" value="{escape(csrf_token(request))}">
+<button class="primary">Generar token personal</button></form>
+<p class="meta">El token dura {identity.token_days()} días y da a tu IA tus mismos permisos: guárdalo como una contraseña.
+Sofibot no lo guarda y no puede volver a mostrarlo. Al cambiar la contraseña de la cuenta, todos sus tokens dejan de valer.</p>"""
+    elif exe:
         automatic = """<h2>2 · Conectar automáticamente</h2>
 <div class="actions"><a class="button primary" href="/descargas/sofibot-conectar.zip">Descargar el conector de Sofibot</a></div>
 <ol><li>Abre el fichero descargado (<code>sofibot-conectar.zip</code>) y pulsa <b>Extraer todo</b>.</li>
@@ -394,9 +419,62 @@ pega el bloque de Codex al final, cambia <code>SOFIBOT_AI</code> a <code>codex</
 {automatic}
 <h2>3 · Probarlo</h2><p>En Claude o Codex, pregunta: <em>«¿Qué puedo consultar en Sofibot?»</em> o
 <em>«Crea en Sofibot un informe de ventas por mes con Excel»</em>. La primera vez puede pedirte iniciar sesión.</p>
-<details{" open" if not exe else ""}><summary><b>Configuración manual (avanzado)</b></summary>{where}{blocks}</details>
+{"" if local else f'<details{" open" if not exe else ""}><summary><b>Configuración manual (avanzado)</b></summary>{where}{blocks}</details>'}
 <p class="meta">Los datos que consulta tu IA llegan a su proveedor: úsala solo con la cuenta de IA que autorice la empresa.</p>"""
     return ui.page(request, "Conectar tu IA", body, active="conectar")
+
+
+def csrf_token(request: Request) -> str:
+    token = request.session.get("csrf")
+    if not token:
+        token = request.session["csrf"] = secrets.token_urlsafe(32)
+    return token
+
+
+@router.post("/conectar/token", response_class=HTMLResponse)
+async def personal_token(request: Request):
+    """A local account's token for its connectors, shown once (it is not stored anywhere)."""
+    who = ui.user(request)
+    fields = parse_qs((await request.body()).decode("utf-8", "replace"))
+    expected = request.session.get("csrf", "")
+    if who is None or who.via != "local":
+        return ui.page(request, "Conectar tu IA", "<h1>Conectar tu IA</h1>" + ui.notice(
+            "Los tokens personales son solo para cuentas locales: con Microsoft, el conector inicia sesión por ti."),
+            active="conectar", status=403)
+    if not expected or not secrets.compare_digest((fields.get("csrf") or [""])[0], expected):
+        return RedirectResponse("/conectar", 303)
+    account = auth.local_account(request.session.get("user") or {})
+    if account is None or identity.local_secret() is None:
+        return ui.page(request, "Conectar tu IA", "<h1>Conectar tu IA</h1>" + ui.notice(
+            "Esta instalación no emite tokens: falta SOFIBOT_LOCAL_SECRET. Avisa a sistemas (docs/09-inicio-sesion-entra.md)."),
+            active="conectar", status=503)
+    days = identity.token_days()
+    token = identity.issue_token(who.email, account, minutes=days * 24 * 60)
+    log.info("Personal token issued for the local account %s (%d days)", who.email, days)
+    settings, exe = connection_settings(), exe_file() is not None
+    blocks = ""
+    for name, mode, role, available, url in (
+            ("sofibot-informes", "informes", ROLE_AUTHOR, settings["informes"], None),
+            ("sofibot-consultas", "consultas", ROLE_QUERY, settings["consultas"],
+             os.environ.get("SOFIBOT_QUERY_PUBLIC_URL", "").strip().rstrip("/") or None)):
+        if available and role in who.roles:
+            blocks += f"<h3>Conector de {mode}</h3>" + "".join(
+                f"<h4>{escape(label)}</h4><pre><code>{escape(text)}</code></pre>"
+                for label, text in snippets(name, mode, "claude", url, exe, token=token).items())
+    where = (f'Guarda <a href="/descargas/sofibot-mcp.exe">sofibot-mcp.exe</a> en <code>{FOLDER}\\</code>.' if exe else
+             f'Descarga <a href="/descargas/sofibot-mcp.zip">los conectores en Python</a>, descomprímelos en <code>{FOLDER}</code> '
+             'y, con Python 3.12, ejecuta allí <code>python -m venv .venv</code> y <code>.venv\\Scripts\\pip install -r requirements.txt</code>.')
+    body = f"""<h1>Tu token personal</h1>
+{ui.notice(f"Cópialo ahora: no se volverá a mostrar. Caduca en {days} días; entonces genera otro en esta página.")}
+<pre><code>{escape(token)}</code></pre>
+<h2>Configura tu IA</h2><p>{where} Después pega el bloque de tu IA: Claude Desktop en <em>Configuración → Desarrollador →
+Editar configuración</em>, Claude Code con el comando en PowerShell y Codex al final de
+<code>%USERPROFILE%\\.codex\\config.toml</code> (cambia <code>SOFIBOT_AI</code> a <code>codex</code>). Reinicia la IA.</p>
+{blocks or ui.notice("Tus roles no incluyen ningún conector (Sofibot.Autor o Sofibot.Consultas) o no están activados.")}
+<p class="meta">Quien tenga este token actúa en Sofibot como tú: no lo compartas ni lo subas a ningún repositorio.</p>"""
+    response = ui.page(request, "Tu token personal", body, active="conectar")
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @router.get("/descargas/sofibot-conectar.zip")

@@ -21,8 +21,11 @@ secretos*.env
 .admin/
 
 # Usuarios y roles (docs/09-inicio-sesion-entra.md): tienen correos de personas.
-# Copias que guarda la administración al cambiar usuarios o permisos.
+# Cuentas locales: hashes de contraseñas de cada instalación. Copias que guarda la
+# administración al cambiar usuarios o permisos.
 usuarios.json
+cuentas-locales.json
+/acceso/permisos.json
 .copias/
 
 # Registro del servicio de consultas (docs/11-consultas.md)

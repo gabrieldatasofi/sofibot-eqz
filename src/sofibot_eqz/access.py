@@ -1,11 +1,15 @@
-"""Who may do what when users sign in with Microsoft Entra ID (docs/09-inicio-sesion-entra.md).
+"""Who may do what with per-user sign-in (docs/09-inicio-sesion-entra.md).
 
 Entra ID only signs users in: it says who the user is (their e-mail), nothing else. Sofibot
-decides what they may do, with two files in the acceso/ folder:
+decides what they may do, with the files in the acceso/ folder:
 
 - usuarios.json: each user's roles, by e-mail. Function roles (Sofibot.Autor, ...) open each
   functionality; data roles (any other name) give Gold tables.
 - permisos.json: each data role's Gold tables ("*" = all).
+- cuentas-locales.json: accounts that sign in with a user name and password instead of
+  Entra ID (the emergency administrator, or every user where there is no Entra ID). Only
+  the password's hash is kept; each account carries its own roles, where "*" means every
+  Gold table (identity.py checks the passwords and Sofibot's own tokens).
 
 A report is visible when the user's roles, together, cover every table the report reads (its
 report.json "tables"): a report is built in advance for everyone, so it cannot show only part
@@ -25,6 +29,8 @@ ALL = "*"
 TABLE = re.compile(r"\w+\.\w+")
 ROLE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 EMAIL = re.compile(r"[^@\s\"<>]+@[^@\s\"<>]+")
+# Local account names have no "@", so they can never be mistaken for an Entra ID user.
+USERNAME = re.compile(r"[a-z0-9][a-z0-9._-]{1,63}")
 log = logging.getLogger("sofibot")
 
 
@@ -117,6 +123,50 @@ def save_users(users: dict[str, list[str]]) -> None:
     save(users_file(), {"usuarios": {email: sorted(set(roles)) for email, roles in sorted(users.items())}}, read_users)
 
 
+# --- Local accounts: user name -> password hash and roles -------------------------------
+
+def local_accounts_file():
+    return config.ACCESS_DIR / "cuentas-locales.json"
+
+
+def read_local_accounts() -> dict[str, dict]:
+    """Name -> {"nombre", "hash", "version", "roles"}. Missing file: no accounts. Malformed: PermissionsError."""
+    path = local_accounts_file()
+    if not path.is_file():
+        return {}
+    data = _json(path)
+    accounts = data.get("cuentas") if isinstance(data, dict) else None
+    if not isinstance(accounts, dict):
+        raise PermissionsError(f'{path}: expected {{"cuentas": {{"<user>": {{"hash": ..., "roles": [...]}}}}}}')
+    result = {}
+    for name, account in accounts.items():
+        if not USERNAME.fullmatch(name):
+            raise PermissionsError(f'{path}: "{name}" is not a valid user name (lower case, no "@")')
+        roles = account.get("roles") if isinstance(account, dict) else None
+        if (not isinstance(account.get("hash"), str) or not isinstance(account.get("version"), int)
+                or not isinstance(roles, list)
+                or not all(isinstance(r, str) and (r == ALL or ROLE_NAME.fullmatch(r)) for r in roles)):
+            raise PermissionsError(f'{path}: "{name}" needs "hash", a whole "version" and a list of "roles"')
+        result[name] = {"nombre": str(account.get("nombre") or name), "hash": account["hash"],
+                        "version": account["version"], "roles": tuple(sorted(set(roles)))}
+    return result
+
+
+def load_local_accounts() -> dict[str, dict]:
+    """Like read_local_accounts(), but a broken file lets no local account in instead of failing."""
+    try:
+        return read_local_accounts()
+    except PermissionsError as exc:
+        log.warning("Local accounts: %s. No local account can sign in until it is fixed.", exc)
+        return {}
+
+
+def save_local_accounts(accounts: dict[str, dict]) -> None:
+    data = {name: {"nombre": a["nombre"], "hash": a["hash"], "version": a["version"], "roles": sorted(set(a["roles"]))}
+            for name, a in sorted(accounts.items())}
+    save(local_accounts_file(), {"cuentas": data}, read_local_accounts)
+
+
 # --- Permissions: data role -> Gold tables ------------------------------------------------
 
 def read() -> dict[str, set[str]]:
@@ -154,7 +204,10 @@ def save_permissions(roles: dict[str, list[str]]) -> None:
 
 
 def granted(roles, permissions: dict[str, set[str]]) -> set[str]:
-    """Union of the tables of every role the user has."""
+    """Union of the tables of every role the user has. "*" among the roles (only a local
+    account can have it: usuarios.json rejects it) is every table."""
+    if ALL in roles:
+        return {ALL}
     return set().union(*(permissions.get(role, set()) for role in roles))
 
 

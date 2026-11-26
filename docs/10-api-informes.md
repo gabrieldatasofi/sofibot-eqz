@@ -155,6 +155,14 @@ Después basta con pedir el informe: *"crea un informe de ventas por tienda de l
 12 meses, con Excel"*. El asistente sigue la guía que devuelve `describe_schema` y envía
 el borrador cuando se lo pidáis.
 
+## Con una cuenta local (sin Microsoft)
+
+Una cuenta local ([09 · Cuentas locales](09-inicio-sesion-entra.md#cuentas-locales-sin-entra-id))
+no puede iniciar sesión con Microsoft: su conector usa un **token personal** que genera en
+**Conectar tu IA → Generar token personal** (variable `SOFIBOT_API_TOKEN` del conector), firmado
+por Sofibot con `SOFIBOT_LOCAL_SECRET`. Tiene los mismos roles y tablas que la cuenta, caduca y
+deja de valer al cambiar su contraseña.
+
 ## Seguridad
 
 - La IA trabaja **solo con la estructura** de las tablas del autor: ninguna ruta devuelve

@@ -170,6 +170,14 @@ docker compose run --rm consultas sofibot consultas-registro consultas --out /ap
 docker compose run --rm consultas sofibot consultas-registro preguntas --out /app/consultas/preguntas.csv
 ```
 
+## Con una cuenta local (sin Microsoft)
+
+Una cuenta local ([09 · Cuentas locales](09-inicio-sesion-entra.md#cuentas-locales-sin-entra-id))
+no puede iniciar sesión con Microsoft: su conector usa un **token personal** que genera en
+**Conectar tu IA → Generar token personal** (variable `SOFIBOT_API_TOKEN` del conector), firmado
+por Sofibot con `SOFIBOT_LOCAL_SECRET`. Tiene los mismos roles y tablas que la cuenta, caduca y
+deja de valer al cambiar su contraseña.
+
 ## Seguridad
 
 - La API no acepta SQL: los nombres de tablas y columnas salen del catálogo y todos los

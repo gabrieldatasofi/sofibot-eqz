@@ -1,19 +1,29 @@
 """Who is calling, the same way for both functionalities (docs/11-consultas.md, docs/10-api-informes.md).
 
-Everyone signs in with Microsoft Entra ID. The portal keeps the user in its session
-(auth.py); the APIs receive an Entra access token (`Authorization: Bearer <token>`) that a
-client, such as the Sofibot MCP server, obtained by signing the user in. This module checks
-that token: signed by Entra for this tenant, issued for this application, for a user (a
-delegated token with `scp`, not an application's own token) and not expired.
+People sign in with Microsoft Entra ID or, with a local account (acceso/cuentas-locales.json),
+with a user name and password. The portal keeps the user in its session (auth.py); the APIs
+receive a token (`Authorization: Bearer <token>`) that a client, such as the Sofibot MCP
+server, sends for the user:
+
+- an Entra access token, obtained by signing the user in. Checked here: signed by Entra for
+  this tenant, issued for this application, for a user (a delegated token with `scp`, not an
+  application's own token) and not expired;
+- for a local account, a token issued by Sofibot itself (page "Conectar tu IA"), signed with
+  SOFIBOT_LOCAL_SECRET, which the portal and the query service share. It is only valid while
+  the account exists and its password has not changed since (the account's "version").
 
 Entra ID only says who the user is. What they may do is decided by Sofibot, the same way for
 both functionalities (access.py): acceso/usuarios.json gives each e-mail its roles, the
 function roles below (one per functionality) and data roles, and acceso/permisos.json gives
 each data role its Gold tables. Roles in the token, if the Entra app still has any, are ignored.
 """
+import base64
 from dataclasses import dataclass, field
 import functools
+import hashlib
 import os
+import secrets
+import time
 
 ROLE_AUTHOR = "Sofibot.Autor"        # functionality 1: read the schema, write report drafts
 ROLE_REVIEWER = "Sofibot.Revisor"    # functionality 1: preview, publish or reject drafts
@@ -32,16 +42,21 @@ class Identity:
     email: str
     name: str = ""
     roles: tuple[str, ...] = field(default_factory=tuple)
-    via: str = "entra"               # entra | token (shared token, tests only) | cli
+    via: str = "entra"               # entra | local (local account) | token (shared token, tests only) | cli
+
+    @property
+    def per_user(self) -> bool:
+        """A person with roles (Entra ID or local account), not the shared test token or the CLI."""
+        return self.via in ("entra", "local")
 
     def has(self, role: str) -> bool:
-        return self.via != "entra" or role in self.roles
+        return not self.per_user or role in self.roles
 
     def tables(self, permissions: dict[str, set[str]]) -> set[str] | None:
         """Gold tables this user may touch (lower case); None = every table (shared token, CLI)."""
         from .access import ALL, granted
 
-        if self.via != "entra":
+        if not self.per_user:
             return ALL_TABLES
         allowed = granted(self.roles, permissions)
         return ALL_TABLES if ALL in allowed else allowed
@@ -82,12 +97,19 @@ def _signing_key(token: str, settings: EntraApi):
 
 
 def from_bearer(authorization: str, env=os.environ) -> Identity:
-    """Identity from an `Authorization: Bearer <Entra access token>` header, or IdentityError."""
+    """Identity from an `Authorization: Bearer <token>` header (Entra or Sofibot's own), or IdentityError."""
     import jwt
 
     if not authorization.startswith("Bearer ") or not authorization[7:].strip():
-        raise IdentityError("Sign-in required: send a Microsoft Entra ID access token")
+        raise IdentityError("Sign-in required: send a Microsoft Entra ID access token or a Sofibot token")
     token = authorization[7:].strip()
+    try:
+        algorithm = jwt.get_unverified_header(token).get("alg")
+    except jwt.InvalidTokenError as exc:
+        raise IdentityError(f"Invalid token: {exc}") from exc
+    # Only chooses which check runs: each one accepts its own algorithm alone (HS256 or RS256).
+    if algorithm == LOCAL_ALGORITHM:
+        return from_local_token(token, env)
     settings = EntraApi.from_environment(env)
     try:
         claims = jwt.decode(token, _signing_key(token, settings), algorithms=["RS256"],
@@ -111,4 +133,108 @@ def from_bearer(authorization: str, env=os.environ) -> Identity:
 
 def from_session(user: dict) -> Identity:
     """The portal's signed-in user (auth.current_user, which already looked up the roles)."""
-    return Identity(email=user.get("email", ""), name=user.get("name", ""), roles=tuple(user.get("roles", ())))
+    return Identity(email=user.get("email", ""), name=user.get("name", ""), roles=tuple(user.get("roles", ())),
+                    via="local" if user.get("local") else "entra")
+
+
+# --- Local accounts: passwords and Sofibot's own tokens -----------------------------------
+
+# scrypt (memory-hard, in Python's standard library). The parameters are stored with each
+# hash, so they can be raised later without invalidating the existing passwords.
+SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 15, 8, 1
+MIN_PASSWORD = 12
+LOCAL_ALGORITHM, LOCAL_ISSUER, LOCAL_AUDIENCE = "HS256", "sofibot", "sofibot-api"
+_dummy_hash: list[str] = []
+
+
+def _b64(data: bytes) -> str:
+    return base64.b64encode(data).decode("ascii")
+
+
+def hash_password(password: str) -> str:
+    if len(password) < MIN_PASSWORD:
+        raise ValueError(f"The password needs {MIN_PASSWORD} characters or more")
+    salt = secrets.token_bytes(16)
+    digest = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P,
+                            maxmem=64 * 1024 * 1024, dklen=32)
+    return f"scrypt${SCRYPT_N}${SCRYPT_R}${SCRYPT_P}${_b64(salt)}${_b64(digest)}"
+
+
+def password_matches(password: str, stored: str) -> bool:
+    try:
+        kind, n, r, p, salt, digest = stored.split("$")
+        if kind != "scrypt":
+            return False
+        expected = base64.b64decode(digest)
+        actual = hashlib.scrypt(password.encode("utf-8"), salt=base64.b64decode(salt), n=int(n), r=int(r),
+                                p=int(p), maxmem=128 * 1024 * 1024, dklen=len(expected))
+    except (ValueError, TypeError):
+        return False
+    return secrets.compare_digest(actual, expected)
+
+
+def local_sign_in(name: str, password: str) -> dict | None:
+    """The local account (with its "usuario") if the password is right, else None."""
+    from .access import load_local_accounts
+
+    name = (name or "").strip().casefold()
+    account = load_local_accounts().get(name)
+    if account is None:
+        # Spend the same time as a real check, so that timing does not tell which names exist.
+        if not _dummy_hash:
+            _dummy_hash.append(hash_password(secrets.token_urlsafe(16)))
+        password_matches(password, _dummy_hash[0])
+        return None
+    if not password_matches(password, account["hash"]):
+        return None
+    return {**account, "usuario": name}
+
+
+def local_secret(env=os.environ) -> str | None:
+    """SOFIBOT_LOCAL_SECRET when usable: 32 characters or more, different from the other tokens."""
+    value = env.get("SOFIBOT_LOCAL_SECRET", "").strip()
+    others = {env.get("SOFIBOT_ADMIN_TOKEN", "").strip(), env.get("SOFIBOT_API_TOKEN", "").strip()}
+    return value if len(value) >= 32 and value not in others else None
+
+
+def token_days(env=os.environ) -> int:
+    """How long a token from the page 'Conectar tu IA' lasts (SOFIBOT_LOCAL_TOKEN_DAYS, 1 to 365)."""
+    try:
+        days = int(env.get("SOFIBOT_LOCAL_TOKEN_DAYS", "") or 30)
+    except ValueError:
+        days = 30
+    return max(1, min(365, days))
+
+
+def issue_token(name: str, account: dict, minutes: int, env=os.environ) -> str:
+    """A token for a local account, for the MCP servers and the query service."""
+    import jwt
+
+    secret = local_secret(env)
+    if secret is None:
+        raise IdentityError("SOFIBOT_LOCAL_SECRET is not configured (32 characters or more)")
+    now = int(time.time())
+    claims = {"iss": LOCAL_ISSUER, "aud": LOCAL_AUDIENCE, "sub": name, "name": account.get("nombre", name),
+              "ver": account["version"], "iat": now, "exp": now + minutes * 60}
+    return jwt.encode(claims, secret, algorithm=LOCAL_ALGORITHM)
+
+
+def from_local_token(token: str, env=os.environ) -> Identity:
+    """Identity from a token issued by issue_token(), or IdentityError."""
+    import jwt
+
+    from .access import load_local_accounts
+
+    secret = local_secret(env)
+    if secret is None:
+        raise IdentityError("Sofibot tokens are not accepted here (SOFIBOT_LOCAL_SECRET is not configured)")
+    try:
+        claims = jwt.decode(token, secret, algorithms=[LOCAL_ALGORITHM], audience=LOCAL_AUDIENCE,
+                            issuer=LOCAL_ISSUER, leeway=60, options={"require": ["exp", "iat", "sub", "ver"]})
+    except jwt.InvalidTokenError as exc:
+        raise IdentityError(f"Invalid token: {exc}") from exc
+    account = load_local_accounts().get(claims["sub"])
+    if account is None or account["version"] != claims["ver"]:
+        raise IdentityError("Invalid token: the account no longer exists or its password has changed; "
+                            "create a new token in Sofibot, page 'Conectar tu IA'")
+    return Identity(email=claims["sub"], name=account["nombre"], roles=account["roles"], via="local")

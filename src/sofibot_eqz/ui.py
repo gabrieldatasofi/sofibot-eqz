@@ -9,7 +9,7 @@ from .identity import ROLE_ADMIN, ROLE_REVIEWER, Identity, from_session
 
 
 def user(request: Request) -> Identity | None:
-    """The signed-in Entra ID user, or None when the portal has no per-user sign-in."""
+    """The signed-in user (Entra ID or local account), or None when the portal has no per-user sign-in."""
     current = auth.current_user(request)
     return None if current is None else from_session(current)
 
@@ -26,7 +26,8 @@ def page(request: Request, title: str, body: str, *, active: str = "", status: i
                   for key, href, label in links)
     account = ""
     if who is not None:
-        account = (f'<span class="who">{escape(who.name or who.email)}</span>'
+        local = ' <span class="tag">cuenta local</span>' if who.via == "local" else ""
+        account = (f'<span class="who">{escape(who.name or who.email)}{local}</span>'
                    '<a href="/auth/logout">Cerrar sesión</a>')
     html = (SHELL.replace("{title}", escape(title)).replace("{nav}", nav).replace("{account}", account)
             .replace("{body}", body))

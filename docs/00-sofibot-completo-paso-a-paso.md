@@ -219,6 +219,17 @@ esa persona, el menú tiene **Administración** (no hace falta volver a iniciar 
 El resto de personas y roles se gestionan desde el portal (parte E). Este comando solo hace
 falta para el primero, o si alguna vez nadie queda con `Sofibot.Admin`.
 
+**Recomendado: administrador de emergencia.** Una cuenta local entra con usuario y contraseña,
+sin pasar por Microsoft, por si un día falla Entra ID:
+
+```bash
+docker compose run --rm sofibot sofibot local-account add sofibot.admin --generate
+```
+
+Muestra la contraseña **una sola vez**: guardadla en el gestor de contraseñas de la empresa.
+Desde ese momento, la página de entrada ofrece también usuario y contraseña. Detalle y
+precauciones: [09 · Cuentas locales](09-inicio-sesion-entra.md#cuentas-locales-sin-entra-id).
+
 ---
 
 # Parte D · Consultas de datos (DBA, sistemas y Datasofi)

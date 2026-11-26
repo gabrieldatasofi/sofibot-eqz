@@ -9,6 +9,12 @@
     sofibot users                       list acceso/usuarios.json (who has which roles)
     sofibot users add EMAIL ROLE [...]  give a user roles (e.g. the first Sofibot.Admin)
     sofibot users remove EMAIL [ROLE]   take roles away, or the user if no role is named
+    sofibot local-account               list the local accounts (sign-in without Entra ID)
+    sofibot local-account add NAME [--generate] [--roles R ...]   create one (default: every role, every table)
+    sofibot local-account passwd NAME   change its password (its sessions and tokens stop working)
+    sofibot local-account revoke NAME   end its sessions and tokens, keeping the password
+    sofibot local-account roles NAME R ...   set its roles ("*" = every Gold table)
+    sofibot local-account remove NAME   delete it
     sofibot permissions                 check acceso/permisos.json (who sees which report)
     sofibot drafts                      list report drafts written through the API
     sofibot publish SLUG                copy a reviewed draft into reports/ (then build it)
@@ -159,6 +165,85 @@ def users(args) -> int:
     unknown = sorted({r for roles in current.values() for r in roles if r.startswith("Sofibot.") and r not in FUNCTION_ROLES})
     if unknown:
         print(f"WARNING: unknown function roles {', '.join(unknown)} (they are {', '.join(FUNCTION_ROLES)})", file=sys.stderr)
+    return 0
+
+
+def local_account(args) -> int:
+    """Manage acceso/cuentas-locales.json. Prints names and roles only, never a hash.
+
+    A password is typed (hidden) or, with --generate, made at random and printed once: run it
+    yourself in a terminal, never through an AI assistant, which would then see the password.
+    """
+    import getpass
+    import secrets
+
+    from .access import ALL, ROLE_NAME, USERNAME, PermissionsError, local_accounts_file, read_local_accounts, \
+        save_local_accounts
+    from .identity import FUNCTION_ROLES, MIN_PASSWORD, hash_password
+
+    try:
+        accounts = {name: dict(account) for name, account in read_local_accounts().items()}
+    except PermissionsError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    name = args.name.strip().casefold()
+    if args.action != "list":
+        if not USERNAME.fullmatch(name):
+            print("ERROR: give a user name: lower case letters, digits, '.', '_' or '-', no '@' (e.g. sofibot.admin)",
+                  file=sys.stderr)
+            return 2
+        if args.action != "add" and name not in accounts:
+            print(f"ERROR: {name} is not a local account", file=sys.stderr)
+            return 1
+    roles = list(args.add_roles or args.roles or [])
+    if bad := [r for r in roles if r != ALL and not ROLE_NAME.fullmatch(r)]:
+        print(f"ERROR: invalid role names: {', '.join(bad)}", file=sys.stderr)
+        return 2
+
+    def new_password() -> str | None:
+        if args.generate:
+            password = secrets.token_urlsafe(18)
+            print(f"Password for {name} (shown only now; keep it in the password manager):\n\n    {password}\n")
+            return password
+        password = getpass.getpass(f"New password for {name} ({MIN_PASSWORD} characters or more): ")
+        if len(password) < MIN_PASSWORD:
+            print(f"ERROR: the password needs {MIN_PASSWORD} characters or more", file=sys.stderr)
+            return None
+        if getpass.getpass("Repeat it: ") != password:
+            print("ERROR: the two passwords are different", file=sys.stderr)
+            return None
+        return password
+
+    if args.action == "add":
+        if name in accounts:
+            print(f"ERROR: {name} already exists: use  sofibot local-account passwd {name}", file=sys.stderr)
+            return 1
+        password = new_password()
+        if password is None:
+            return 2
+        accounts[name] = {"nombre": args.display_name or name, "hash": hash_password(password), "version": 1,
+                          "roles": roles or [*FUNCTION_ROLES, ALL]}
+    elif args.action == "passwd":
+        password = new_password()
+        if password is None:
+            return 2
+        accounts[name].update(hash=hash_password(password), version=accounts[name]["version"] + 1)
+    elif args.action == "revoke":
+        accounts[name]["version"] += 1
+    elif args.action == "roles":
+        accounts[name]["roles"] = roles
+    elif args.action == "remove":
+        del accounts[name]
+    if args.action != "list":
+        save_local_accounts(accounts)
+        print(f"Saved. {'Its sessions and tokens no longer work. ' if args.action in ('passwd', 'revoke', 'remove') else ''}"
+              "No restart needed.")
+    print(f"{local_accounts_file()}:")
+    for account_name, account in sorted(accounts.items()):
+        shown = ", ".join("every table" if r == ALL else r for r in account["roles"]) or "(no roles)"
+        print(f"  {account_name}: {shown}")
+    if not accounts:
+        print("  (none: create one with  sofibot local-account add NAME --generate)")
     return 0
 
 
@@ -329,6 +414,14 @@ def main(argv=None) -> int:
     command.add_argument("email", nargs="?", default="")
     command.add_argument("roles", nargs="*", help="role names, e.g. Sofibot.Admin Ventas")
     command.set_defaults(run=users)
+    command = commands.add_parser("local-account", help="manage local accounts (sign-in without Entra ID)")
+    command.add_argument("action", nargs="?", choices=["list", "add", "passwd", "revoke", "roles", "remove"], default="list")
+    command.add_argument("name", nargs="?", default="")
+    command.add_argument("roles", nargs="*", help='with "roles": the roles to set, e.g. Sofibot.Admin "*"')
+    command.add_argument("--roles", dest="add_roles", nargs="+", help="with add: its roles (default: every role and table)")
+    command.add_argument("--generate", action="store_true", help="make a random password and print it once")
+    command.add_argument("--display-name", default="", help="with add: name shown in the portal")
+    command.set_defaults(run=local_account)
     commands.add_parser("permissions", help="check acceso/permisos.json (Entra ID sign-in)").set_defaults(run=permissions)
     commands.add_parser("drafts", help="list report drafts written through the API").set_defaults(run=list_drafts)
     command = commands.add_parser("publish", help="copy a reviewed draft into reports/")

@@ -7,7 +7,7 @@ password, a token or a URL.
 """
 import os
 
-from . import auth, drafts
+from . import auth, drafts, identity
 from .db import AUTH_MODES
 
 FILLED, MISSING, SHORT = "rellena", "FALTA", "DEMASIADO CORTA"
@@ -44,6 +44,19 @@ def _sql(env, lines: list, problems: list) -> None:
         lines.append("  Aviso: SQLSERVER_TRUST_CERTIFICATE=1 solo es para un SQL Server de prueba")
 
 
+def _local_secret(env, lines: list, problems: list) -> bool:
+    """SOFIBOT_LOCAL_SECRET: optional; the same value in the portal and the query service."""
+    value = env.get("SOFIBOT_LOCAL_SECRET", "").strip()
+    if not value:
+        lines.append(f"  {'SOFIBOT_LOCAL_SECRET':32} vacía: las cuentas locales no podrán usar conectores ni Consultas")
+        return False
+    usable = identity.local_secret(env) is not None
+    lines.append(f"  {'SOFIBOT_LOCAL_SECRET':32} {FILLED if usable else SHORT + ' o igual a otro token'}")
+    if not usable:
+        problems.append("SOFIBOT_LOCAL_SECRET necesita 32 caracteres o más y ser distinta de los otros tokens")
+    return usable
+
+
 def review(env=os.environ, service: str = "portal") -> tuple[list[str], list[str]]:
     """Return (lines to print, problems). Values never appear, except the modes in SHOWN."""
     lines: list[str] = []
@@ -56,12 +69,13 @@ def review(env=os.environ, service: str = "portal") -> tuple[list[str], list[str
         _sql(env, lines, problems)
         if env.get("SQLSERVER_USER", "").strip().lower() == "sofibot_lectura":
             problems.append("las consultas usan su propio login (sofibot_consultas), no el del portal")
+        local = _local_secret(env, lines, problems)
         lines.append("Entra ID")
         for name in ("ENTRA_TENANT_ID", "ENTRA_CLIENT_ID"):
             status = _status(env, name)
             lines.append(f"  {name:32} {status}")
-            if status == MISSING:
-                problems.append(f"{name} está vacía")
+            if status == MISSING and not local:
+                problems.append(f"{name} está vacía (o, solo con cuentas locales, rellena SOFIBOT_LOCAL_SECRET)")
         return lines, problems
 
     _sql(env, lines, problems)
@@ -92,6 +106,8 @@ def review(env=os.environ, service: str = "portal") -> tuple[list[str], list[str
             problems.append("SOFIBOT_PUBLIC_URL debe empezar por https://")
     if sign_in == "none":
         lines.append("  Aviso: sin inicio de sesión, cualquiera que llegue al portal ve todos los informes")
+    if sign_in in auth.PER_USER:
+        _local_secret(env, lines, problems)
 
     try:
         code_api = drafts.api_mode(env)
@@ -105,8 +121,8 @@ def review(env=os.environ, service: str = "portal") -> tuple[list[str], list[str
         lines.append(f"  {'SOFIBOT_API_TOKEN':32} {FILLED if ok else MISSING + ' o igual al de administración'}")
         if not ok:
             problems.append("SOFIBOT_API_TOKEN necesita 32 caracteres o más y ser distinto de SOFIBOT_ADMIN_TOKEN")
-    if code_api == "entra" and sign_in != "entra":
-        problems.append("SOFIBOT_CODE_API=entra necesita también SOFIBOT_AUTH=entra")
+    if code_api in drafts.PER_USER_MODES and sign_in not in auth.PER_USER:
+        problems.append(f"SOFIBOT_CODE_API={code_api} necesita también SOFIBOT_AUTH=entra o local")
     queries = bool(env.get("SOFIBOT_QUERY_URL", "").strip())
     lines.append(f"  {'Página Consultas (SOFIBOT_QUERY_URL)':32} {'activada' if queries else 'desactivada'}")
     return lines, problems

@@ -12,6 +12,9 @@ database). Do not look for workarounds.
 - Never read `.env`, `output/`, `*.xlsx`, `*.csv` or any built report.
 - Never run `sofibot build`, `sofibot check`, `generate.py`, `sqlcmd` or ad-hoc SQL
   against a client database. Never ask for or use client credentials.
+- Never run `sofibot local-account` (it shows or asks for passwords: a person runs it),
+  never read `acceso/cuentas-locales.json`, and never ask for or use a local account's
+  password or personal token.
 - The only exception is the public Contoso example on a Datasofi development machine,
   through its own environment: `docker compose -f examples/contoso/compose.yaml ...`, whose
   configuration (`examples/contoso/.env`, never read either) only ever points at the
@@ -50,7 +53,8 @@ Use the `nuevo-informe` skill (.claude/skills/nuevo-informe/SKILL.md). In short:
 - `src/sofibot_eqz/`: package (db, schema, html, excel, projects, cli, server; pages: ui,
   pages, review, admin). Architecture: docs/12-arquitectura.md.
   Two separate functionalities share only `identity.py` (Entra ID tokens, function roles)
-  and `access.py` (roles per user and tables per role, in `acceso/`; Entra only signs in):
+  and `access.py` (roles per user and tables per role, in `acceso/`; Entra only signs in;
+  local accounts with Sofibot's own tokens, docs/09):
   - functionality 1, writing reports: `drafts.py`, `review.py`, `report_guide.md` (keep it in
     sync with docs/04 and the skill), `/api/code`, `mcp-server/sofibot_informes_mcp.py`; docs/10;
   - functionality 2, data queries: `consultas/` (its own app, container and settings),

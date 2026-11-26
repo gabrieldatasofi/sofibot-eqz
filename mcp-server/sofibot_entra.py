@@ -6,7 +6,8 @@ API then knows who is calling and applies that person's roles and tables.
 
 Settings (environment): SOFIBOT_URL, SOFIBOT_ENTRA_TENANT_ID, SOFIBOT_ENTRA_CLIENT_ID,
 optionally SOFIBOT_ENTRA_SCOPE, SOFIBOT_CA_BUNDLE (company CA) and SOFIBOT_AI (claude, codex...).
-For tests only, SOFIBOT_API_TOKEN (the server's shared token) replaces the sign-in.
+SOFIBOT_API_TOKEN replaces the sign-in: a local account's personal token (page "Conectar tu IA",
+for accounts without Microsoft) or, for tests only, the server's shared token.
 """
 import os
 from pathlib import Path

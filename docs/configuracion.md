@@ -34,14 +34,16 @@ a quien os ayude, también a un asistente de IA.
 | Variable | Por defecto | Descripción |
 |---|---|---|
 | `SOFIBOT_ADMIN_TOKEN` | — | Token de la API de administración. Mínimo 32 caracteres. Sin él, la API responde 503 |
-| `SOFIBOT_CODE_API` | `off` | Funcionalidad 1, API de informes para asistentes de IA ([10 · API de informes](10-api-informes.md)): `off`, `entra` (cada autor con su cuenta y el rol `Sofibot.Autor`) o `token` (token compartido, solo para pruebas) |
+| `SOFIBOT_CODE_API` | `off` | Funcionalidad 1, API de informes para asistentes de IA ([10 · API de informes](10-api-informes.md)): `off`, `entra` o `local` (cada autor con su token, de Microsoft o de una cuenta local, y el rol `Sofibot.Autor`; los dos aceptan ambos) o `token` (token compartido, solo para pruebas) |
 | `SOFIBOT_API_TOKEN` | — | Token compartido de la API de informes, solo con `SOFIBOT_CODE_API=token`. Mínimo 32 caracteres, distinto del de administración |
 | `SOFIBOT_REVIEW_OWN` | `0` | `1` permite a un revisor publicar un borrador que envió él mismo |
 | `SOFIBOT_QUERY_URL` | — | Dirección interna del servicio de consultas, `http://consultas:8080`. Activa la página Consultas del portal |
 | `SOFIBOT_QUERY_PUBLIC_URL` | `SOFIBOT_PUBLIC_URL` | Dirección del servicio de consultas para los conectores de Claude y Codex, si no está detrás del mismo proxy HTTPS (por ejemplo, `http://localhost:8086` en pruebas) |
 | `SOFIBOT_API_SCOPE` | `api://<ENTRA_CLIENT_ID>/access_as_user` | Ámbito que pide el portal para reenviar consultas |
 | `SOFIBOT_DRAFTS_DIR` | `reports/.borradores` | Carpeta de los borradores escritos por la API |
-| `SOFIBOT_AUTH` | ver descripción | Inicio de sesión en el portal: `entra`, `basic` o `none` ([05 · Operación](05-operacion.md)). Sin valor: `basic` si hay `SOFIBOT_VIEWER_PASSWORD`, `none` si no |
+| `SOFIBOT_AUTH` | ver descripción | Inicio de sesión en el portal: `entra`, `local` (solo cuentas locales, sin Entra ID), `basic` o `none` ([05 · Operación](05-operacion.md)). Sin valor: `basic` si hay `SOFIBOT_VIEWER_PASSWORD`, `none` si no |
+| `SOFIBOT_LOCAL_SECRET` | — | Firma de los tokens de las cuentas locales (conectores y Consultas). Mínimo 32 caracteres, distinto de los otros tokens; el mismo valor en `.env.consultas` ([09 · Cuentas locales](09-inicio-sesion-entra.md#cuentas-locales-sin-entra-id)) |
+| `SOFIBOT_LOCAL_TOKEN_DAYS` | `30` | Días que dura el token personal de una cuenta local (1 a 365) |
 | `SOFIBOT_VIEWER_USER` | `equivalenza` | Usuario compartido (`basic`) |
 | `SOFIBOT_VIEWER_PASSWORD` | — | Contraseña compartida (`basic`) |
 | `SOFIBOT_BUILD_SCHEDULE` | — | Horas de regeneración diaria, `HH:MM` separadas por comas |
@@ -95,6 +97,7 @@ contenedor `consultas` (plantilla: `.env.consultas.example`).
 | `SQLSERVER_*` | — | Como en `.env`, pero con un login propio (`sofibot_consultas`) |
 | `SQLSERVER_QUERY_TIMEOUT` | `300` | Segundos máximos por consulta. Recomendado: `30` |
 | `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | — | Los mismos que el portal. Sin secreto |
+| `SOFIBOT_LOCAL_SECRET` | — | El mismo que el portal, para aceptar los tokens de las cuentas locales |
 | `SOFIBOT_QUERY_MAX_ROWS` | `1000` | Filas máximas por consulta |
 | `SOFIBOT_QUERY_PER_MINUTE` | `30` | Consultas máximas por usuario y minuto |
 | `SOFIBOT_QUERY_STORE_QUESTIONS` | `0` | `1` guarda el texto de las preguntas en el registro |
