@@ -75,7 +75,8 @@ ENTRA_CLIENT_SECRET=<valor del secreto>
 proyecto**, la misma que con cualquier otra base: usuarios y roles (`usuarios.json`),
 permisos por tabla (`permisos.json`) y cuentas locales como `sofibot.admin`
 (`cuentas-locales.json`). Ninguno va en git. Si `acceso/permisos.json` no existe, créalo con
-los roles de datos de Contoso (o desde **Administración → Permisos por tabla**):
+los roles de datos de Contoso (o desde **Administración → Permisos por tabla**; el formato
+general está en `acceso/permisos.example.json`):
 
 ```json
 {

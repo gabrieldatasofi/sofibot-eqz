@@ -1,0 +1,6 @@
+{
+  "roles": {
+    "Direccion": ["*"],
+    "Ventas": ["gold.ventas_mes_tienda", "gold.ventas_mes_producto"]
+  }
+}

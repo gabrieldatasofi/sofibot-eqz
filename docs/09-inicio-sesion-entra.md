@@ -39,6 +39,10 @@ tiene `gold.costes_producto`. Ana (*Direccion*) ve los dos.
   ese informe. Los informes se generan por adelantado y son iguales para todos los que los
   ven: no se puede mostrar solo una parte de un informe.
 - Quien inicia sesión pero no está en `acceso/usuarios.json` entra al portal y no ve nada.
+- Los dos ficheros se crean solos desde Administración (o con `sofibot users add`). Para ver
+  su formato o prepararlos a mano hay plantillas con datos inventados:
+  `acceso/usuarios.example.json` y `acceso/permisos.example.json` (se copian quitando
+  `.example` del nombre). Sofibot no lee las plantillas.
 - Los cambios de usuarios y permisos se aplican al momento, sin reiniciar y sin que la
   persona tenga que volver a iniciar sesión.
 - Sofibot no guarda contraseñas de los usuarios ni tiene acceso a su correo ni a otros

@@ -1,0 +1,7 @@
+{
+  "usuarios": {
+    "ana@empresa.com": ["Sofibot.Admin", "Direccion"],
+    "luis@empresa.com": ["Sofibot.Consultas", "Ventas"],
+    "marta@empresa.com": ["Sofibot.Autor", "Sofibot.Revisor", "Ventas"]
+  }
+}

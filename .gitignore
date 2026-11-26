@@ -20,13 +20,11 @@ secretos*.env
 .borradores/
 .admin/
 
-# Usuarios y roles (docs/09-inicio-sesion-entra.md): tienen correos de personas.
-# Cuentas locales: hashes de contraseñas. Solo va en git la de la raíz, con la cuenta de
-# pruebas supersofi acordada con EQZ (también viaja en el paquete de instalación).
-# Copias que guarda la administración al cambiar usuarios o permisos.
+# Accesos (docs/09-inicio-sesion-entra.md). usuarios.json tiene correos de personas y
+# permisos.json depende de las tablas de cada instalación: no van en git (plantillas:
+# acceso/*.example.json). acceso/cuentas-locales.json sí va: la cuenta de pruebas supersofi,
+# acordada con EQZ (solo hash y roles). Copias que guarda la administración en cada cambio.
 usuarios.json
-cuentas-locales.json
-!/acceso/cuentas-locales.json
 /acceso/permisos.json
 .copias/
 

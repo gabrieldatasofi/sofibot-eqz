@@ -73,6 +73,9 @@ Copy-Item (Join-Path $root 'docs\*.md') (Join-Path $out 'docs')
 foreach ($keep in 'caddy\certs', 'reports', 'output', 'acceso', 'consultas') { New-Item -ItemType File -Force (Join-Path $out "$keep\.gitkeep") | Out-Null }
 # Cuenta local de pruebas (supersofi, acordada con EQZ): solo nombre, hash y roles, nunca la
 # contraseña, que Datasofi entrega aparte (docs/09-inicio-sesion-entra.md#cuentas-locales-sin-entra-id).
+foreach ($example in 'usuarios.example.json', 'permisos.example.json') {
+    Copy-Item (Join-Path $root "acceso\$example") (Join-Path $out "acceso\$example")
+}
 $accounts = Join-Path $root 'acceso\cuentas-locales.json'
 if (Test-Path $accounts) {
     Copy-Item $accounts (Join-Path $out 'acceso\cuentas-locales.json')
