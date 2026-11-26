@@ -8,7 +8,6 @@ Datos públicos de ejemplo (ContosoRetailDW de Microsoft o Contoso V2 de SQLBI) 
 | `reports/contoso-ventas-tiendas/` | Informe interactivo: barra de filtros, KPIs, gráficos y tablas que se recalculan, Excel por elemento y Excel completo |
 | `reports/contoso-productos-excel/` | Informe que solo entrega un Excel con varias hojas |
 | `compose.yaml` | Portal de pruebas Contoso, separado del proyecto (puerto 8085), con proxy HTTPS opcional |
-| `acceso/permisos.json` | Permisos por tabla Gold para probar el inicio de sesión con Entra ID (los usuarios, en `acceso/usuarios.json`, no van en git) |
 | `.env.example` | Plantilla de su configuración (`examples/contoso/.env`) |
 | `preparar.ps1` | Deja el entorno de pruebas listo en un paso: configuración, login, capa gold, portal e informes |
 | `refrescar.ps1` | Pipeline de prueba: recrea la capa gold y pide al portal de pruebas que regenere los informes |
@@ -72,13 +71,30 @@ ENTRA_CLIENT_ID=<Id. de aplicación (cliente)>
 ENTRA_CLIENT_SECRET=<valor del secreto>
 ```
 
-**3. Permisos y usuarios:** `acceso/permisos.json` ya está preparado:
+**3. Permisos y usuarios.** El entorno de Contoso usa la carpeta `acceso/` de la **raíz del
+proyecto**, la misma que con cualquier otra base: usuarios y roles (`usuarios.json`),
+permisos por tabla (`permisos.json`) y cuentas locales como `sofibot.admin`
+(`cuentas-locales.json`). Ninguno va en git. Si `acceso/permisos.json` no existe, créalo con
+los roles de datos de Contoso (o desde **Administración → Permisos por tabla**):
+
+```json
+{
+  "roles": {
+    "Direccion": ["*"],
+    "Tiendas": ["gold.month_store"],
+    "Producto": ["gold.month_product"]
+  }
+}
+```
 
 | Rol | Tablas Gold | Ve |
 |---|---|---|
 | `Direccion` | todas | los dos informes |
 | `Tiendas` | `gold.month_store` | Contoso · Ventas por tienda |
 | `Producto` | `gold.month_product` | Contoso · Productos (Excel) |
+
+Si pruebas con otra base, cambia solo los permisos por tabla: usuarios y cuentas locales
+siguen siendo los mismos.
 
 Los roles de cada persona los da Sofibot. Tú serás el administrador (con tu correo de
 Microsoft); a la otra persona le das `Tiendas` desde **Administración → Usuarios**:

@@ -71,6 +71,13 @@ foreach ($file in '.env.example', '.env.consultas.example', 'secretos.env.exampl
 }
 Copy-Item (Join-Path $root 'docs\*.md') (Join-Path $out 'docs')
 foreach ($keep in 'caddy\certs', 'reports', 'output', 'acceso', 'consultas') { New-Item -ItemType File -Force (Join-Path $out "$keep\.gitkeep") | Out-Null }
+# Cuenta local de pruebas (supersofi, acordada con EQZ): solo nombre, hash y roles, nunca la
+# contraseña, que Datasofi entrega aparte (docs/09-inicio-sesion-entra.md#cuentas-locales-sin-entra-id).
+$accounts = Join-Path $root 'acceso\cuentas-locales.json'
+if (Test-Path $accounts) {
+    Copy-Item $accounts (Join-Path $out 'acceso\cuentas-locales.json')
+    Write-Host 'Incluida la cuenta local de pruebas (acceso\cuentas-locales.json).' -ForegroundColor Yellow
+}
 
 # compose.yaml del cliente: el del proyecto sin "build", con la imagen publicada fijada por su huella.
 $compose = (Get-Content (Join-Path $root 'compose.yaml') -Raw) -replace '(?m)^\s+build: \.\r?\n', ''

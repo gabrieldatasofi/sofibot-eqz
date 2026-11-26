@@ -142,7 +142,10 @@ def test_entra_mode_offers_both_ways_in(folders, monkeypatch):
     claims = {"tid": TENANT, "aud": CLIENT, "name": "Ana", "preferred_username": "ana@empresa.test"}
     monkeypatch.setattr(auth, "_client", lambda settings: FakeEntra(claims))
     assert client.get("/auth/login").headers["location"].startswith("https://login.test/")  # no local account
+    assert "Iniciar sesión con Microsoft" in client.get("/").text
     add_account()
+    landing = client.get("/").text
+    assert "Iniciar sesión con Microsoft" not in landing and "cuenta local de Sofibot" in landing
     form = client.get("/auth/login?next=/informes").text
     assert "/auth/microsoft?next=/informes" in form and 'name="contrasena"' in form
     local_sign_in(client)

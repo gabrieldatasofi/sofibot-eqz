@@ -146,10 +146,10 @@ construida como fichero:
 ```bash
 # En un equipo con internet (Datasofi)
 docker compose build
-docker save datasofi/sofibot-eqz:0.2.1 -o sofibot-eqz-0.2.1.tar
+docker save datasofi/sofibot-eqz:0.2.2 -o sofibot-eqz-0.2.2.tar
 
 # En el servidor
-docker load -i sofibot-eqz-0.2.1.tar
+docker load -i sofibot-eqz-0.2.2.tar
 docker compose up -d --no-build
 ```
 

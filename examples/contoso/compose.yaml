@@ -18,7 +18,9 @@ services:
     volumes:
       - ./reports:/app/reports
       - ./output:/app/output
-      - ./acceso:/app/acceso
+      # Usuarios, roles, permisos y cuentas locales: la carpeta acceso/ de la raíz, la misma
+      # con Contoso o con cualquier otra base (docs/09-inicio-sesion-entra.md).
+      - ../../acceso:/app/acceso
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -38,7 +40,7 @@ services:
       - "127.0.0.1:${SOFIBOT_QUERY_PORT:-8086}:8080"
     volumes:
       - ./reports:/app/reports:ro
-      - ./acceso:/app/acceso:ro
+      - ../../acceso:/app/acceso:ro
       - ./consultas:/app/consultas
     extra_hosts:
       - "host.docker.internal:host-gateway"

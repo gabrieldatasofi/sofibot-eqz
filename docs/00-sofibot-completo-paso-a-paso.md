@@ -219,6 +219,10 @@ esa persona, el menú tiene **Administración** (no hace falta volver a iniciar 
 El resto de personas y roles se gestionan desde el portal (parte E). Este comando solo hace
 falta para el primero, o si alguna vez nadie queda con `Sofibot.Admin`.
 
+**Cuenta de pruebas `supersofi`.** Ya viene creada: entra con usuario y contraseña, sin
+Microsoft, con todos los roles (la contraseña la entrega Datasofi aparte). Comprobarlo:
+`docker compose run --rm sofibot sofibot local-account`.
+
 **Recomendado: administrador de emergencia.** Una cuenta local entra con usuario y contraseña,
 sin pasar por Microsoft, por si un día falla Entra ID:
 

@@ -44,9 +44,11 @@ def query_url() -> str:
 def landing(request: Request):
     if not auth.per_user() or request.session.get("user"):
         return RedirectResponse("/explore", 302)
-    if auth.mode() == "local":
+    if auth.local_accounts_on():  # the next page offers Microsoft and/or a local account
+        hint = "Con tu usuario de Sofibot." if auth.mode() == "local" else \
+            "Con tu cuenta de Microsoft de la empresa o con una cuenta local de Sofibot."
         return HTMLResponse(LANDING.replace("Iniciar sesión con Microsoft", "Iniciar sesión")
-                            .replace("Usa tu cuenta de la empresa.", "Con tu usuario de Sofibot."))
+                            .replace("Usa tu cuenta de la empresa.", hint))
     return HTMLResponse(LANDING)
 
 

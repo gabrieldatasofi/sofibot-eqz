@@ -1,0 +1,16 @@
+{
+  "cuentas": {
+    "supersofi": {
+      "nombre": "supersofi",
+      "hash": "scrypt$32768$8$1$v55QtDFHLSZORI1FliZlrA==$ZV76k3Mp8/iQ1vMKxOcDhW0lOfc/5YChCkWxazx4QWM=",
+      "version": 1,
+      "roles": [
+        "*",
+        "Sofibot.Admin",
+        "Sofibot.Autor",
+        "Sofibot.Consultas",
+        "Sofibot.Revisor"
+      ]
+    }
+  }
+}

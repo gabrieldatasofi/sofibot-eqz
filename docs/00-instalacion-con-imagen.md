@@ -30,6 +30,7 @@ comandos de los dos. Tiempo aproximado: 20 minutos, más lo que tarde el DBA en 
 |---|---|
 | `sofibot-eqz-<versión>.tar.gz` | El paquete de instalación: `compose.yaml`, plantillas de configuración, `Caddyfile`, el script SQL para el DBA (`sql/crear-login-lectura.sql`), las plantillas de secretos para producción (`secretos.env.example`), la documentación, `INSTALAR-CON-IA.md` y las reglas para asistentes de IA. **No contiene el código del programa**, que va dentro de la imagen |
 | Un usuario de GitHub y un **token de solo lectura** | Descargar la imagen del registro privado de Datasofi (`ghcr.io`). Solo permite descargar |
+| La contraseña de **`supersofi`**, aparte | La cuenta de pruebas que ya viene en el paquete (`acceso/cuentas-locales.json`, solo su *hash*): entra con usuario y contraseña, sin Entra ID, con todos los roles |
 
 El `compose.yaml` del paquete apunta a la versión exacta de la imagen por su huella
 (`@sha256:…`): aunque alguien publicara otra imagen con el mismo nombre, vuestro servidor
@@ -208,7 +209,14 @@ la carpeta.
 
 ## Después de arrancar
 
-Sofibot ya funciona en el propio equipo. Para que lo use vuestra gente queda configurar, en
+Sofibot ya funciona en el propio equipo. Para empezar a probar, entrad en el portal con la
+cuenta de pruebas **`supersofi`** (usuario y contraseña, sin Microsoft): tiene todos los roles
+y todas las tablas. Con `SOFIBOT_AUTH=local` en `.env` no hace falta configurar Entra ID; para
+que sus conectores de Claude o Codex y la página Consultas funcionen, rellenad también
+`SOFIBOT_LOCAL_SECRET` (en `.env` y `.env.consultas`, el mismo valor). Detalle:
+[09 · Cuentas locales](09-inicio-sesion-entra.md#cuentas-locales-sin-entra-id).
+
+Para que lo use vuestra gente queda configurar, en
 este orden, lo que explica con detalle [00 · Sofibot completo paso a paso](00-sofibot-completo-paso-a-paso.md)
 (en la carpeta `docs/` del paquete):
 
@@ -231,7 +239,10 @@ Datasofi os entrega el paquete de la versión nueva:
 
 1. Descomprimidlo en otra carpeta y copiad **solo** su `compose.yaml` encima del vuestro
    (y `docs/`, si queréis la documentación nueva). **No toquéis** `.env`, `.env.consultas`,
-   `reports/`, `output/`, `acceso/`, `consultas/` ni `caddy/certs/`: son vuestros.
+   `reports/`, `output/`, `acceso/`, `consultas/` ni `caddy/certs/`: son vuestros. Única
+   excepción, al pasar de una versión sin cuentas locales (0.2.1 o anterior) a la 0.2.2: si
+   vuestra `acceso/` no tiene `cuentas-locales.json`, copiad el del paquete para tener
+   `supersofi`.
 2. Descargad y arrancad:
 
    ```bash

@@ -321,7 +321,15 @@ Crea `sofibot.admin` con todos los roles y todas las tablas, y muestra **una sol
 contraseña aleatoria: guardadla en el gestor de contraseñas de la empresa. Sin `--generate`,
 pide escribirla (12 caracteres o más). Con `--roles` se dan otros roles, por ejemplo
 `--roles Sofibot.Consultas Ventas`. Cada instalación crea su propia cuenta y su propia
-contraseña: el fichero no va en git (`.gitignore`) ni en el paquete de instalación.
+contraseña.
+
+**Cuenta de pruebas `supersofi`.** Acordada con EQZ para empezar a trabajar: tiene todos los
+roles y todas las tablas, entra solo con usuario y contraseña y ya viene creada en
+`acceso/cuentas-locales.json` del repositorio y del paquete de instalación (solo su *hash*).
+Datasofi entrega la contraseña aparte, nunca por correo ni en un fichero. Cuando acaben las
+pruebas, o si la contraseña ha circulado más de la cuenta, cambiadla en el servidor
+(`sofibot local-account passwd supersofi --generate`) o borrad la cuenta
+(`sofibot local-account remove supersofi`).
 
 | Tarea | Comando (en la carpeta de Sofibot) |
 |---|---|

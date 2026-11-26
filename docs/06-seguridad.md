@@ -64,8 +64,9 @@ acceso de emergencia que no depende de Microsoft, y por eso mismo hay que cuidar
 - pocas: normalmente una, `sofibot.admin`, y solo con los roles que necesite;
 - contraseña aleatoria (`--generate`), guardada en el gestor de contraseñas de la empresa y
   conocida por pocas personas; cambiarla (`sofibot local-account passwd`) cuando alguien que
-  la conocía deja de necesitarla. Cada instalación tiene la suya: no se comparte entre clientes
-  ni se sube a git;
+  la conocía deja de necesitarla. La cuenta de pruebas `supersofi` viene creada en el
+  repositorio y en el paquete de instalación (acordado con EQZ): antes de trabajar con datos
+  en producción de forma estable, cambiad su contraseña en el servidor o borradla;
 - Sofibot solo guarda su *hash* (scrypt), bloquea temporalmente tras 5 fallos en 15 minutos y
   registra en el log cada entrada, cada fallo y cada token emitido;
 - sus tokens personales (para Claude o Codex) caducan (`SOFIBOT_LOCAL_TOKEN_DAYS`) y se anulan
