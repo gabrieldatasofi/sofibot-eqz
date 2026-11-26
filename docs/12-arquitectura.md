@@ -16,7 +16,7 @@ funcionalidades separadas:
 | Documentación | [10 · API de informes](10-api-informes.md) | [11 · Consultas](11-consultas.md) |
 
 Lo único que comparten es **el inicio de sesión** (Microsoft Entra ID) y **los permisos
-por tabla** (`reports/permisos.json`).
+por tabla** (`acceso/permisos.json`).
 
 ## Piezas
 
@@ -47,7 +47,7 @@ por tabla** (`reports/permisos.json`).
 | `/consultas` | Rol `Sofibot.Consultas` | Formulario de consultas. El portal no consulta la base: reenvía la petición al servicio de consultas con el token del propio usuario |
 | `/conectar` | Con sesión | Configuración de Claude y Codex y descarga de los conectores MCP |
 | `/revision` | Rol `Sofibot.Revisor` | Código, vista previa, publicar o rechazar borradores |
-| `/admin` | Rol `Sofibot.Admin` | Estado (SQL Server, esquema, Entra ID, funcionalidades, MCP), permisos y esta documentación |
+| `/admin` | Rol `Sofibot.Admin` | Estado (SQL Server, esquema, Entra ID, funcionalidades, MCP), usuarios y roles, permisos por tabla y esta documentación |
 | `/output/<informe>/` | Con permiso sobre sus tablas | El informe generado y su Excel |
 
 ## Identidad y permisos
@@ -56,9 +56,12 @@ por tabla** (`reports/permisos.json`).
   sesión es una cookie firmada con nombre, correo y roles.
 - **APIs** (`/api/code`, `/api/query`): un token de acceso de Entra ID del usuario
   (`identity.py`): de este inquilino, para esta aplicación, de una persona y sin caducar.
-- **Roles de funcionalidad** (en Entra ID): `Sofibot.Autor`, `Sofibot.Revisor`,
+- **Entra ID solo valida el inicio de sesión** (quién es). Los roles los da Sofibot, por
+  correo, en `acceso/usuarios.json` (editable en Administración → Usuarios; el primer
+  administrador, con `sofibot users add`). Los roles que lleve el token de Entra se ignoran.
+- **Roles de funcionalidad**: `Sofibot.Autor`, `Sofibot.Revisor`,
   `Sofibot.Consultas`, `Sofibot.Admin`.
-- **Roles de tablas** (en Entra ID, con sus tablas en `reports/permisos.json`, editable en
+- **Roles de datos** (con sus tablas en `acceso/permisos.json`, editable en
   `/admin/permisos`): qué tablas Gold puede tocar cada persona en las dos funcionalidades.
 
 Detalle: [09 · Inicio de sesión con Entra ID](09-inicio-sesion-entra.md).
@@ -113,9 +116,10 @@ Python.
 
 | Carpeta | Contenido |
 |---|---|
-| `reports/` | Proyectos de informe, `gold_schema.json`, `catalogo.json`, `permisos.json` |
+| `reports/` | Proyectos de informe, `gold_schema.json`, `catalogo.json` |
+| `acceso/` | `usuarios.json` (roles de cada persona) y `permisos.json` (tablas de cada rol de datos); copias en `acceso/.copias/`. El servicio de consultas la monta en solo lectura |
 | `reports/.borradores/` | Borradores de la funcionalidad 1, su registro y el código anterior de cada publicación |
-| `reports/.admin/` | Registro de la administración y copias de `permisos.json` |
+| `reports/.admin/` | Registro de la administración |
 | `output/` | Informes generados; `output/.previews/` las vistas previas de los revisores |
 | `consultas/` | Registro de la funcionalidad 2 |
 | `docs/`, `mcp-server/` | Esta documentación y los conectores (también dentro de la imagen) |

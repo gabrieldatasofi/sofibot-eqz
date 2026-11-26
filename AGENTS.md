@@ -35,7 +35,7 @@ Use the `nuevo-informe` skill (.claude/skills/nuevo-informe/SKILL.md). In short:
 - A report is `reports/<slug>/report.json` + `generate.py`. Create it with
   `sofibot new <slug> --name "..." --table gold.<table>` and edit the template.
 - `report.json` "tables" lists every Gold table `generate.py` reads: the build fails on any
-  other, and portal permissions (`reports/permisos.json`) are granted per table.
+  other, and portal permissions (`acceso/permisos.json`) are granted per table.
 - Read only Gold tables listed in `reports/gold_schema.json`, through
   `sofibot_eqz.Gold`: one connection per report, `?` parameters for every variable value.
 - HTML page with `Report` (lang `es`), Excel with `Workbook`. Give `Workbook` real
@@ -50,7 +50,7 @@ Use the `nuevo-informe` skill (.claude/skills/nuevo-informe/SKILL.md). In short:
 - `src/sofibot_eqz/`: package (db, schema, html, excel, projects, cli, server; pages: ui,
   pages, review, admin). Architecture: docs/12-arquitectura.md.
   Two separate functionalities share only `identity.py` (Entra ID tokens, function roles)
-  and `access.py` (tables per role):
+  and `access.py` (roles per user and tables per role, in `acceso/`; Entra only signs in):
   - functionality 1, writing reports: `drafts.py`, `review.py`, `report_guide.md` (keep it in
     sync with docs/04 and the skill), `/api/code`, `mcp-server/sofibot_informes_mcp.py`; docs/10;
   - functionality 2, data queries: `consultas/` (its own app, container and settings),

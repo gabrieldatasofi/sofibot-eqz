@@ -249,7 +249,7 @@ docker compose run --rm sofibot sofibot build --all             # todos
 - Si `generate.py` falla, el informe anterior se conserva y el error aparece en la salida del comando.
 - El portal muestra el informe en cuanto termina el build. Con inicio de sesión por Entra ID,
   solo lo ven las personas con acceso a todas sus tablas (`tables` en `report.json`), según
-  `reports/permisos.json` ([09 · Inicio de sesión con Entra ID](09-inicio-sesion-entra.md)).
+  `acceso/permisos.json` ([09 · Inicio de sesión con Entra ID](09-inicio-sesion-entra.md)).
 - Con `SOFIBOT_BUILD_SCHEDULE` el portal regenera todos los informes cada día ([05 · Operación](05-operacion.md)).
 
 ## 7. Buenas prácticas

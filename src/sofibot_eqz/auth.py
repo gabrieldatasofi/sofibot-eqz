@@ -3,8 +3,8 @@
 - none: open portal (only for a server nobody else can reach);
 - basic: one shared user and password (SOFIBOT_VIEWER_USER / SOFIBOT_VIEWER_PASSWORD);
 - entra: each person signs in with their Microsoft Entra ID account (OpenID Connect,
-  authorization code flow with PKCE, through Microsoft's MSAL library). The app roles in the
-  sign-in token decide which reports they see (access.py).
+  authorization code flow with PKCE, through Microsoft's MSAL library). Entra ID only says
+  who they are; their roles, and so what they see, come from acceso/usuarios.json (access.py).
 
 Without SOFIBOT_AUTH: basic if SOFIBOT_VIEWER_PASSWORD is set, none otherwise.
 
@@ -25,6 +25,8 @@ import warnings
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+
+from . import access
 
 MODES = ("none", "basic", "entra")
 log = logging.getLogger("sofibot")
@@ -129,7 +131,10 @@ def current_user(request: Request) -> dict | None:
     if mode() != "entra":
         return None
     # The sign-in middleware only lets signed-in users through; an empty user sees nothing.
-    return request.session.get("user") or {"name": "", "roles": []}
+    user = dict(request.session.get("user") or {"name": "", "email": ""})
+    # Roles come from acceso/usuarios.json on every request, never from Entra: a change applies at once.
+    user["roles"] = list(access.roles_of(user.get("email", "")))
+    return user
 
 
 def safe_next(value: str | None) -> str:
@@ -180,12 +185,11 @@ def callback(request: Request):
     user = {
         "name": claims.get("name") or claims.get("preferred_username", ""),
         "email": claims.get("preferred_username", ""),
-        "roles": sorted(role for role in claims.get("roles", []) if isinstance(role, str)),
     }
     request.session.clear()
     request.session["user"] = user
     keep_api_token(request, result)
-    log.info("Signed in: %s, roles %s", user["email"], ", ".join(user["roles"]) or "(none)")
+    log.info("Signed in: %s, roles %s", user["email"], ", ".join(access.roles_of(user["email"])) or "(none)")
     return RedirectResponse(next_path, 302)
 
 

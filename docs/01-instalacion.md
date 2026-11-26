@@ -61,7 +61,8 @@ de solo lectura.
    usuario `10001`. Dos opciones:
 
    ```bash
-   sudo chown -R 10001:10001 reports output
+   mkdir -p acceso
+   sudo chown -R 10001:10001 reports output acceso
    ```
 
    o bien ejecutarlo con vuestro usuario, añadiendo a `.env`:

@@ -11,6 +11,8 @@
       "Read(**/*.bak)",
       "Read(**/output/**)",
       "Read(**/consultas/**)",
+      "Read(**/acceso/**)",
+      "Edit(**/acceso/**)",
       "Read(**/reports/.admin/**)",
       "Read(**/caddy/certs/**)",
       "Read(**/*.xlsx)",

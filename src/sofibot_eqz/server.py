@@ -288,7 +288,7 @@ def report_file(slug: str, file_path: str, request: Request):
         raise HTTPException(404, "Not found")
     if not access.visible(auth.current_user(request), projects.built_tables(slug)):
         return auth.page("Sin acceso a este informe", "Tu usuario no tiene permiso para ver este informe. "
-                         "Si lo necesitas, pide acceso a sistemas.", ("/informes", "Ir a mis informes"), status=403)
+                         "Si lo necesitas, pide acceso a un administrador de Sofibot.", ("/informes", "Ir a mis informes"), status=403)
     folder = (config.OUTPUT_DIR / slug).resolve()
     target = (folder / file_path).resolve()
     if target.is_dir():

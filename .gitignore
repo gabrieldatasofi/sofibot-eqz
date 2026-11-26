@@ -20,6 +20,11 @@ secretos*.env
 .borradores/
 .admin/
 
+# Usuarios y roles (docs/09-inicio-sesion-entra.md): tienen correos de personas.
+# Copias que guarda la administración al cambiar usuarios o permisos.
+usuarios.json
+.copias/
+
 # Registro del servicio de consultas (docs/11-consultas.md)
 /consultas/
 

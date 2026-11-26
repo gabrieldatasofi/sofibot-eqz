@@ -201,7 +201,7 @@ def run() -> int:
         else:
             say(f"3. {'Crear informes' if mode == 'informes' else 'Consultas'}: no disponible ({result['error']})")
     if not modes:
-        say("\nTu usuario no puede usar ningún conector: pide a sistemas el rol Sofibot.Autor o Sofibot.Consultas.")
+        say("\nTu usuario no puede usar ningún conector: pide a un administrador de Sofibot el rol Sofibot.Autor o Sofibot.Consultas.")
         return 1
 
     for ai, path, kind in found:

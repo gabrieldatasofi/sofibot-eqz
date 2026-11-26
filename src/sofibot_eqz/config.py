@@ -11,6 +11,9 @@ load_dotenv(HOME / ".env", override=False)
 REPORTS_DIR = Path(os.environ.get("SOFIBOT_REPORTS_DIR", HOME / "reports")).resolve()
 OUTPUT_DIR = Path(os.environ.get("SOFIBOT_OUTPUT_DIR", HOME / "output")).resolve()
 SCHEMA_FILE = REPORTS_DIR / "gold_schema.json"
+# Who may do what (access.py): usuarios.json (user -> roles) and permisos.json (role -> Gold tables).
+# Entra ID only signs users in; the roles are managed here (docs/09-inicio-sesion-entra.md).
+ACCESS_DIR = Path(os.environ.get("SOFIBOT_ACCESS_DIR", HOME / "acceso")).resolve()
 # Shipped in the image next to the code: the technical documentation shown to administrators
 # and the MCP servers users download (in a checkout, the repository's own folders).
 DOCS_DIR = Path(os.environ.get("SOFIBOT_DOCS_DIR", HOME / "docs")).resolve()

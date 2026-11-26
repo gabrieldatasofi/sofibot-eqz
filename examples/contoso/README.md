@@ -8,7 +8,7 @@ Datos públicos de ejemplo (ContosoRetailDW de Microsoft o Contoso V2 de SQLBI) 
 | `reports/contoso-ventas-tiendas/` | Informe interactivo: barra de filtros, KPIs, gráficos y tablas que se recalculan, Excel por elemento y Excel completo |
 | `reports/contoso-productos-excel/` | Informe que solo entrega un Excel con varias hojas |
 | `compose.yaml` | Portal de pruebas Contoso, separado del proyecto (puerto 8085), con proxy HTTPS opcional |
-| `reports/permisos.json` | Permisos por tabla Gold para probar el inicio de sesión con Entra ID |
+| `acceso/permisos.json` | Permisos por tabla Gold para probar el inicio de sesión con Entra ID (los usuarios, en `acceso/usuarios.json`, no van en git) |
 | `.env.example` | Plantilla de su configuración (`examples/contoso/.env`) |
 | `preparar.ps1` | Deja el entorno de pruebas listo en un paso: configuración, login, capa gold, portal e informes |
 | `refrescar.ps1` | Pipeline de prueba: recrea la capa gold y pide al portal de pruebas que regenere los informes |
@@ -54,15 +54,13 @@ Se prueba con el Entra ID de Datasofi y dos o más usuarios de Datasofi, en loca
 falta el proxy HTTPS. Son los mismos pasos que hará el cliente
 ([09 · Inicio de sesión con Entra ID](../../docs/09-inicio-sesion-entra.md)), con estos valores.
 
-**1. En Entra ID de Datasofi** (pasos 1 a 4 de la guía):
+**1. En Entra ID de Datasofi** (pasos 1, 2 y 4 de la guía; sin roles de aplicación):
 
 - Registro de aplicación `Sofibot pruebas`, inquilino único, URI de redirección **Web**
   `http://localhost:8085/auth/callback`.
 - Un secreto de cliente (caducidad corta, por ejemplo 3 meses).
-- Tres roles de aplicación con estos **valores**: `Direccion`, `Tiendas` y `Producto`.
-- En Aplicaciones empresariales → `Sofibot pruebas`: "¿Se requiere asignación?" = Sí, y
-  asignar un rol distinto a cada usuario de prueba. Por ejemplo, tú `Direccion` y otra
-  persona `Tiendas`.
+- Opcional: en Aplicaciones empresariales → `Sofibot pruebas`, "¿Se requiere asignación?" = Sí
+  y asignar los usuarios de prueba (sin rol), para comprobar que los demás no entran.
 
 **2. En `examples/contoso/.env`** añade (el secreto no sale de ese fichero):
 
@@ -74,13 +72,20 @@ ENTRA_CLIENT_ID=<Id. de aplicación (cliente)>
 ENTRA_CLIENT_SECRET=<valor del secreto>
 ```
 
-**3. Permisos:** `reports/permisos.json` ya está preparado:
+**3. Permisos y usuarios:** `acceso/permisos.json` ya está preparado:
 
 | Rol | Tablas Gold | Ve |
 |---|---|---|
 | `Direccion` | todas | los dos informes |
 | `Tiendas` | `gold.month_store` | Contoso · Ventas por tienda |
 | `Producto` | `gold.month_product` | Contoso · Productos (Excel) |
+
+Los roles de cada persona los da Sofibot. Tú serás el administrador (con tu correo de
+Microsoft); a la otra persona le das `Tiendas` desde **Administración → Usuarios**:
+
+```powershell
+docker compose -f examples/contoso/compose.yaml run --rm sofibot sofibot users add <tu correo> Sofibot.Admin Direccion
+```
 
 **4. Reconstruir, regenerar y probar:**
 
@@ -98,9 +103,10 @@ Qué comprobar:
 - [ ] Redirige al inicio de sesión de Microsoft y vuelve al portal con tu nombre arriba.
 - [ ] `Direccion` ve los dos informes; `Tiendas` solo el de tiendas.
 - [ ] Con `Tiendas`, abrir a mano `http://localhost:8085/output/contoso-productos-excel/` muestra "Sin acceso a este informe".
-- [ ] Un usuario de Datasofi sin rol asignado no llega al portal (Microsoft muestra `AADSTS50105`).
+- [ ] Un usuario de Datasofi que no está en Usuarios entra pero no ve ningún informe (con asignación exigida, Microsoft no le deja pasar: `AADSTS50105`).
+- [ ] Al darle `Tiendas` en Administración → Usuarios, ve el informe de tiendas al recargar, sin volver a iniciar sesión.
 - [ ] "Cerrar sesión" vuelve a pedir el inicio de sesión.
-- [ ] Al quitar `gold.month_store` de `Tiendas` en `permisos.json`, el informe desaparece sin reiniciar.
+- [ ] Al quitar `gold.month_store` de `Tiendas` en Administración → Permisos por tabla, el informe desaparece sin reiniciar.
 - [ ] `docker compose -f examples/contoso/compose.yaml logs sofibot` muestra un `Signed in:` por cada entrada.
 
 Para volver al portal sin inicio de sesión, quita `SOFIBOT_AUTH=entra` de `.env` y ejecuta
@@ -112,8 +118,8 @@ Sobre la misma aplicación `Sofibot pruebas` del apartado anterior.
 
 **1. En Entra ID**, en esa aplicación ([09 · Roles de las funcionalidades](../../docs/09-inicio-sesion-entra.md#roles-de-las-funcionalidades)):
 
-- Roles de aplicación con los valores `Sofibot.Autor`, `Sofibot.Revisor`,
-  `Sofibot.Consultas` y `Sofibot.Admin`, asignados a tu usuario (además de `Direccion`).
+- Nada de roles: en **Administración → Usuarios** date `Sofibot.Autor`, `Sofibot.Revisor` y
+  `Sofibot.Consultas` (además de `Sofibot.Admin` y `Direccion`).
 - **Exponer una API**: URI `api://<id. de cliente>` y ámbito `access_as_user`.
 - **Autenticación → Aplicaciones móviles y de escritorio**: `http://localhost`, y
   *Permitir flujos de clientes públicos: Sí*.
@@ -133,7 +139,7 @@ consultas en el puerto 8086) y arranca el entorno.
 
 - [ ] Portada → Iniciar sesión con Microsoft → Explorar, con las dos tarjetas activas.
 - [ ] Consultas: ventas por país de 2024 en el formulario.
-- [ ] Administración: comprobar la conexión, permisos (cambiar uno y ver el efecto) y documentación.
+- [ ] Administración: comprobar la conexión, usuarios y permisos (cambiar uno y ver el efecto) y documentación.
 - [ ] Conectar tu IA: descargar los conectores, configurarlos en Claude Code y preguntar
       por los datos de Contoso; después pedirle un informe nuevo.
 - [ ] Revisión: generar la vista previa del borrador de Claude y publicarlo.

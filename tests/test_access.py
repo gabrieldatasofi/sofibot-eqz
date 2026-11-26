@@ -4,6 +4,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from conftest import grant
 from sofibot_eqz import access, auth, cli
 
 TENANT, CLIENT = "tenant-id", "client-id"
@@ -62,8 +63,10 @@ def portal(folders, monkeypatch):
     return TestClient(app, base_url="https://testserver", follow_redirects=False)
 
 
-def sign_in(client, monkeypatch, roles, tenant=TENANT, error=None):
-    claims = {"tid": tenant, "aud": CLIENT, "name": "Ana Pérez", "preferred_username": "ana@empresa.test", "roles": roles}
+def sign_in(client, monkeypatch, roles, tenant=TENANT, error=None, email="ana@empresa.test"):
+    """Entra signs the user in; their roles are the ones an administrator gave them in Sofibot."""
+    grant(email, roles)
+    claims = {"tid": tenant, "aud": CLIENT, "name": "Ana Pérez", "preferred_username": email}
     monkeypatch.setattr(auth, "_client", lambda settings: FakeEntra(claims, error))
     response = client.get("/auth/login", params={"next": "/output/ventas/"})
     assert response.status_code == 302 and response.headers["location"].startswith("https://login.test/")
@@ -236,3 +239,62 @@ def test_permissions_command(folders, capsys):
     assert "no role can see 'finanzas': its tables gold.costes are in no role" in err
     (folders / "reports" / "permisos.json").write_text("{}")
     assert cli.main(["permissions"]) == 1
+
+
+# --- acceso/: users and the move from reports/permisos.json ----------------------------
+
+def test_entra_roles_in_the_token_are_ignored(entra, folders, monkeypatch):
+    write_permissions(folders, {"Ventas": ["*"]})
+    claims = {"tid": TENANT, "aud": CLIENT, "name": "Eva", "preferred_username": "eva@empresa.test", "roles": ["Ventas"]}
+    monkeypatch.setattr(auth, "_client", lambda settings: FakeEntra(claims))
+    entra.get("/auth/login")
+    assert entra.get("/auth/callback", params={"code": "c1", "state": "s1"}).status_code == 302
+    assert entra.get("/output/ventas/").status_code == 403          # not in usuarios.json: nothing
+    grant("EVA@empresa.test", ["Ventas"])                            # an administrator adds her
+    assert entra.get("/output/ventas/").status_code == 200          # no new sign-in needed
+
+
+def test_broken_users_file_gives_no_roles(entra, folders, monkeypatch):
+    write_permissions(folders, {"Ventas": ["*"]})
+    sign_in(entra, monkeypatch, ["Ventas"])
+    (folders / "acceso" / "usuarios.json").write_text('{"usuarios": {"ana@empresa.test": "Ventas"}}')
+    assert entra.get("/output/ventas/").status_code == 403
+    with pytest.raises(access.PermissionsError):
+        access.read_users()
+
+
+@pytest.mark.parametrize("content", ['{"usuarios": {"no-email": []}}', '{"usuarios": {"a@b.c": ["con espacio"]}}',
+                                     '{"usuarios": {"a@b.c": [], "A@B.C": []}}', '{"users": {}}'])
+def test_users_file_is_validated(folders, content):
+    (folders / "acceso").mkdir()
+    (folders / "acceso" / "usuarios.json").write_text(content)
+    with pytest.raises(access.PermissionsError):
+        access.read_users()
+
+
+def test_permissions_move_from_reports_to_acceso(folders):
+    write_permissions(folders, {"Ventas": ["gold.ventas"]})          # installation from before acceso/
+    assert access.permissions_file() == folders / "reports" / "permisos.json"
+    assert access.read() == {"Ventas": {"gold.ventas"}}
+    access.save_permissions({"Costes": ["gold.costes"]})
+    assert access.permissions_file() == folders / "acceso" / "permisos.json"
+    assert access.read() == {"Costes": {"gold.costes"}}
+    with pytest.raises(access.PermissionsError):                    # an invalid save is undone
+        access.save_permissions({"Costes": ["costes"]})
+    assert access.read() == {"Costes": {"gold.costes"}}
+
+
+def test_users_command(folders, capsys):
+    assert cli.main(["users"]) == 0
+    assert "add the first administrator" in capsys.readouterr().out
+    assert cli.main(["users", "add", "Ana@Empresa.test", "Sofibot.Admin", "Ventas"]) == 0
+    assert access.roles_of("ana@empresa.test") == ("Sofibot.Admin", "Ventas")
+    assert cli.main(["users", "remove", "ana@empresa.test", "Ventas"]) == 0
+    assert access.roles_of("ana@empresa.test") == ("Sofibot.Admin",)
+    assert cli.main(["users", "add", "luis@empresa.test", "Sofibot.Consultas"]) == 0
+    assert cli.main(["users", "remove", "ana@empresa.test"]) == 0
+    out, err = capsys.readouterr()
+    assert "luis@empresa.test: Sofibot.Consultas" in out and "nobody has Sofibot.Admin" in err
+    assert cli.main(["users", "add", "no-email", "Ventas"]) == 2
+    assert cli.main(["users", "add", "ana@empresa.test"]) == 2
+    assert cli.main(["users", "remove", "nadie@empresa.test"]) == 1

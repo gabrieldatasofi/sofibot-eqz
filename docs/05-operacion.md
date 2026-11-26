@@ -44,7 +44,7 @@ publicarlo:
 | `/informes` | Ver informes publicados y los borradores propios |
 | `/consultas`, `/conectar` | Consultar datos; conectar Claude o Codex |
 | `/revision` | Revisores: vista previa y publicación de informes |
-| `/admin` | Administradores (`Sofibot.Admin`): estado de SQL Server, esquema, Entra ID, funcionalidades y MCP; **permisos** (`/admin/permisos`) y **documentación técnica** (`/admin/docs`) |
+| `/admin` | Administradores (`Sofibot.Admin`): estado de SQL Server, esquema, Entra ID, funcionalidades y MCP; **usuarios y roles** (`/admin/usuarios`), **permisos por tabla** (`/admin/permisos`) y **documentación técnica** (`/admin/docs`) |
 
 Desde `/admin` se comprueba la conexión a SQL Server y se actualiza el contrato de esquema
 sin usar la línea de comandos. Arquitectura completa: [12 · Arquitectura](12-arquitectura.md).

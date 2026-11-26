@@ -8,7 +8,8 @@ de las dos queda Sofibot funcionando con el portal de informes. Esta guía añad
 - inicio de sesión de cada persona con su cuenta de **Microsoft Entra ID**;
 - **funcionalidad 1**: crear informes con un asistente de IA (Claude o Codex) que nunca ve los datos;
 - **funcionalidad 2**: consultar datos desde el portal o con la IA de cada persona;
-- la página de **administración**, con los permisos de usuarios y la documentación técnica.
+- la página de **administración**, con los usuarios y sus roles, los permisos por tabla y la
+  documentación técnica.
 
 Tiempo aproximado: 1 hora de trabajo, más lo que tarden el administrador de Entra ID
 (parte B) y el DBA (paso D1).
@@ -45,10 +46,10 @@ desde la carpeta de Sofibot). Solo cambian estos:
 | Parte | Quién | Qué |
 |---|---|---|
 | A · HTTPS | Sistemas | Nombre en el DNS, certificado y proxy |
-| B · Entra ID | Administrador de Entra ID | Registrar la aplicación, roles y permisos: una checklist |
-| C · Inicio de sesión e informes con IA | Sistemas | Configurar `.env` y probar |
+| B · Entra ID | Administrador de Entra ID | Registrar la aplicación (solo el inicio de sesión): una checklist |
+| C · Inicio de sesión e informes con IA | Sistemas | Configurar `.env`, nombrar al primer administrador y probar |
 | D · Consultas | DBA y sistemas, con Datasofi | Segundo login, catálogo y servicio de consultas |
-| E · Permisos y usuarios | Administrador de Sofibot | Qué tablas ve cada rol, desde el portal |
+| E · Permisos y usuarios | Administrador de Sofibot | Roles de datos, sus tablas y los roles de cada persona, desde el portal |
 
 ## Antes de empezar: qué necesitas
 
@@ -112,6 +113,9 @@ usuario con rol *Administrador de aplicaciones* o superior. Sustituye
 `informes.empresa.local` por el nombre del paso A1. Detalle de cada pantalla:
 [09 · Inicio de sesión con Entra ID](09-inicio-sesion-entra.md).
 
+Entra ID solo valida el inicio de sesión: **no hay que crear roles de aplicación**. Los
+roles de cada persona se dan después en Sofibot (parte E).
+
 **1. Registrar la aplicación** · *Identidad → Aplicaciones → Registros de aplicaciones → Nuevo registro*
 
 - [ ] Nombre: `Sofibot` (o el que prefiráis).
@@ -125,49 +129,36 @@ usuario con rol *Administrador de aplicaciones* o superior. Sustituye
 - [ ] Copiar el **Valor** (no el Id.): solo se muestra una vez.
 - [ ] Apuntar la fecha de caducidad en un calendario: cuando caduca, nadie puede entrar.
 
-**3. Roles** · *Roles de aplicación → Crear rol de aplicación*, todos con miembros
-**Usuarios o grupos**. Lo que cuenta es el **Valor**, exacto:
-
-| Valor | Nombre para mostrar | Para |
-|---|---|---|
-| `Sofibot.Autor` | Autor de informes | Crear informes con un asistente de IA |
-| `Sofibot.Revisor` | Revisor de informes | Revisar, previsualizar y publicar informes |
-| `Sofibot.Consultas` | Consultas de datos | Consultar datos |
-| `Sofibot.Admin` | Administración de Sofibot | Página de administración: estado, permisos, documentación |
-| `Direccion`, `Ventas`… | Uno por perfil de acceso a datos | Qué tablas Gold ve cada persona (sin espacios ni acentos en el valor) |
-
-- [ ] Los cuatro roles `Sofibot.*`.
-- [ ] Un rol por cada perfil de acceso a datos.
-
-**4. Exponer la API** · *Exponer una API*
+**3. Exponer la API** · *Exponer una API*
 
 - [ ] **Agregar** el URI de id. de aplicación: dejar el que propone, `api://<id. de cliente>`.
 - [ ] **Agregar un ámbito**: nombre `access_as_user`, consentimiento *Administradores y
       usuarios*, nombre para mostrar *Usar Sofibot en nombre del usuario*, estado *Habilitado*.
 
-**5. Cliente público (conectores de Claude y Codex)** · *Autenticación*
+**4. Cliente público (conectores de Claude y Codex)** · *Autenticación*
 
 - [ ] *Agregar una plataforma → Aplicaciones móviles y de escritorio* con la URI
       personalizada `http://localhost` (sin marcar las sugeridas).
 - [ ] *Configuración avanzada → Permitir flujos de clientes públicos: Sí → Guardar*.
 
-**6. Permisos y consentimiento** · *Permisos de API*
+**5. Permisos y consentimiento** · *Permisos de API*
 
 - [ ] *Agregar un permiso → Mis API → Sofibot → access_as_user*.
 - [ ] **Conceder consentimiento de administrador**. Las filas pasan a "Concedido".
 
-**7. Asignación** · *Identidad → Aplicaciones → Aplicaciones empresariales → Sofibot*
+**6. Opcional: quién puede iniciar sesión** · *Identidad → Aplicaciones → Aplicaciones empresariales → Sofibot*
+
+Sin este paso puede iniciar sesión cualquiera del directorio, pero no ve nada hasta que un
+administrador de Sofibot le da roles. Para limitarlo:
 
 - [ ] *Propiedades → ¿Se requiere asignación?: Sí → Guardar*.
-- [ ] *Usuarios y grupos → Agregar*: cada **grupo** (o persona) con sus roles: uno o
-      varios de datos y los de funcionalidad que correspondan. Un rol por asignación.
-- [ ] Al menos una persona con `Sofibot.Admin` y un rol de datos, para la parte E.
+- [ ] *Usuarios y grupos → Agregar*: el **grupo** (o las personas) que usará Sofibot, sin rol
+      ("Acceso predeterminado").
 
-**8. Entregar a quien administra el servidor de Sofibot**
+**7. Entregar a quien administra el servidor de Sofibot**
 
 - [ ] Id. de inquilino e id. de cliente.
 - [ ] El valor del secreto, por un canal seguro (gestor de contraseñas), **nunca por correo**.
-- [ ] La lista de **valores** de los roles de datos.
 
 ---
 
@@ -211,7 +202,22 @@ docker compose logs sofibot --tail 20
 - `RuntimeError: SOFIBOT_AUTH=entra needs ...` en el log → falta una variable del paso C1.
 - Microsoft muestra un código `AADSTS…` → tabla de [problemas frecuentes](#problemas-frecuentes).
 
-Todavía no verás informes: falta decir qué tablas ve cada rol (parte E).
+Todavía no verás nada más: nadie tiene roles (paso C3).
+
+## Paso C3 · Nombrar al primer administrador
+
+Con el **correo de Microsoft** de quien va a administrar Sofibot (el que usa para iniciar
+sesión):
+
+```bash
+docker compose run --rm sofibot sofibot users add <correo> Sofibot.Admin
+```
+
+✅ **Bien si** el comando lista ese correo con `Sofibot.Admin` y, al recargar el portal con
+esa persona, el menú tiene **Administración** (no hace falta volver a iniciar sesión).
+
+El resto de personas y roles se gestionan desde el portal (parte E). Este comando solo hace
+falta para el primero, o si alguna vez nadie queda con `Sofibot.Admin`.
 
 ---
 
@@ -284,20 +290,42 @@ entrar** una vez después de este paso.
 
 # Parte E · Permisos y usuarios (administrador de Sofibot)
 
-## Paso E1 · Qué tablas ve cada rol
+Todo se hace en el portal, con `Sofibot.Admin`. Primero los roles de datos y sus tablas;
+después las personas. Los cambios se aplican al momento, sin reiniciar ni volver a iniciar
+sesión, y quedan registrados con tu correo. Detalle: [09 · Entra ID](09-inicio-sesion-entra.md#9-roles-de-datos-permisos-por-tabla-y-usuarios).
 
-En el portal, con `Sofibot.Admin`: **Administración → Permisos**.
+## Paso E1 · Roles de datos: qué tablas ve cada uno
 
-- Una fila por rol de datos: escribe su **valor** exacto en "Nuevo rol" y marca sus tablas
-  Gold (o *Todas*). Guardar. Repetir con cada rol.
+**Administración → Permisos por tabla**.
+
+- Una fila por perfil de acceso a datos: escribe su nombre en "Nuevo rol de datos" (sin
+  espacios ni acentos: `Direccion`, `Ventas`, `Tiendas`…) y marca sus tablas Gold (o
+  *Todas*). Guardar. Repetir con cada rol.
 - La última columna muestra qué informes verá cada rol.
 
-Los cambios se aplican al momento, sin reiniciar, y quedan registrados con tu correo.
+## Paso E2 · Usuarios y sus roles
+
+**Administración → Usuarios**.
+
+- Una fila por persona: escribe su **correo de Microsoft** en la última fila y marca sus
+  roles. Guardar. Repetir con cada persona.
+- Roles de funcionalidad: `Autor` (crear informes con IA), `Revisor` (revisar y publicar),
+  `Consultas` (consultar datos), `Admin` (esta administración).
+- Roles de datos: los del paso E1. Todos necesitan al menos uno para ver algo.
+- Añade también tus propios roles de datos si vas a ver informes.
+
+| Perfil típico | Roles |
+|---|---|
+| Solo ve informes | un rol de datos |
+| Consulta datos con su IA | `Consultas` + rol de datos |
+| Escribe informes con su IA | `Autor` + rol de datos |
+| Revisa y publica informes | `Revisor` + rol de datos |
+| Administra Sofibot | `Admin` (+ rol de datos) |
 
 ✅ **Bien si** una persona con un rol de datos entra y ve en **Informes** solo los informes
 de sus tablas.
 
-## Paso E2 · Comprobar la parte técnica
+## Paso E3 · Comprobar la parte técnica
 
 En **Administración**:
 
@@ -307,7 +335,7 @@ En **Administración**:
 - [ ] *Funcionalidad 1*: *API de informes: entra*.
 - [ ] *Funcionalidad 2*: *Servicio de consultas: Responde*.
 
-## Paso E3 · Conectar Claude o Codex (cada persona, una vez)
+## Paso E4 · Conectar Claude o Codex (cada persona, una vez)
 
 Para autores (`Sofibot.Autor`) y para quien consulte con su IA (`Sofibot.Consultas`).
 Cada persona necesita tener instalada su IA (Claude Desktop, Claude Code o Codex; la
@@ -337,7 +365,7 @@ en el PC.
 
 | Prueba | Resultado esperado |
 |---|---|
-| Entrar con una persona sin ningún rol | Microsoft no la deja pasar (`AADSTS50105`) |
+| Entrar con una persona que no está en Usuarios | Entra, pero no ve ningún informe (con asignación exigida en B6, Microsoft no la deja pasar: `AADSTS50105`) |
 | Entrar con un rol de datos | Ve solo los informes de sus tablas |
 | Consultas → una consulta sencilla | Tabla con resultados; en *Administración* no aparece ningún valor |
 | Autor: pedir a Claude un informe | Aparece el borrador en **Revisión** |
@@ -350,15 +378,16 @@ en el PC.
 | Síntoma | Causa y solución |
 |---|---|
 | `AADSTS50011` (redirect URI mismatch) | La URI del paso B1 no coincide con `SOFIBOT_PUBLIC_URL` + `/auth/callback` |
-| `AADSTS50105` | La persona no tiene ningún rol asignado (paso B7) |
-| `AADSTS65001` o `AADSTS90094` (se necesita aprobación) | Falta el consentimiento de administrador (paso B6) |
+| `AADSTS50105` | Se exige asignación (paso B6) y la persona o su grupo no están asignados |
+| `AADSTS65001` o `AADSTS90094` (se necesita aprobación) | Falta el consentimiento de administrador (paso B5) |
 | `AADSTS7000215` / `invalid_client` en el log | Secreto incorrecto o caducado: nuevo secreto y cambiar `ENTRA_CLIENT_SECRET` |
 | Consultas: «Tu sesión para consultas ha caducado» | Normal cada hora, o tras activar el servicio: **Volver a entrar** |
 | Consultas: «no está activado» | Falta `SOFIBOT_QUERY_URL` en `.env` (paso D4) |
-| Consultas: «No tienes tablas consultables» | Sus roles de datos no tienen tablas del catálogo (pasos D3 y E1) |
-| El conector de Claude dice `Audience doesn't match` | El ámbito del paso B4 no es `api://<id. de cliente>/access_as_user` |
-| El conector de Claude dice `certificate verify failed` | Falta `SOFIBOT_CA_BUNDLE` (paso E3) |
-| Las APIs responden 403 `does not have the Sofibot.… role` | Falta ese rol en Entra (paso B7); después, volver a iniciar sesión |
+| Consultas: «No tienes tablas consultables» | Sus roles de datos no tienen tablas del catálogo (pasos D3, E1 y E2) |
+| Entra pero no ve nada, o no tiene Administración | No está en Usuarios o su correo no es el de Microsoft (paso E2; el primer administrador, paso C3) |
+| El conector de Claude dice `Audience doesn't match` | El ámbito del paso B3 no es `api://<id. de cliente>/access_as_user` |
+| El conector de Claude dice `certificate verify failed` | Falta `SOFIBOT_CA_BUNDLE` (paso E4) |
+| Las APIs responden 403 `does not have the Sofibot.… role` | Falta ese rol de funcionalidad en Administración → Usuarios (paso E2) |
 
 Más casos: [09 · Entra ID](09-inicio-sesion-entra.md#problemas-frecuentes),
 [11 · Consultas](11-consultas.md) y [Solución de problemas](solucion-de-problemas.md).

@@ -6,9 +6,10 @@ client, such as the Sofibot MCP server, obtained by signing the user in. This mo
 that token: signed by Entra for this tenant, issued for this application, for a user (a
 delegated token with `scp`, not an application's own token) and not expired.
 
-What a user may do comes from two places, also the same for both functionalities:
-- the function roles below (Entra app roles), one per functionality;
-- the table roles of reports/permisos.json (access.py), which say which Gold tables.
+Entra ID only says who the user is. What they may do is decided by Sofibot, the same way for
+both functionalities (access.py): acceso/usuarios.json gives each e-mail its roles, the
+function roles below (one per functionality) and data roles, and acceso/permisos.json gives
+each data role its Gold tables. Roles in the token, if the Entra app still has any, are ignored.
 """
 from dataclasses import dataclass, field
 import functools
@@ -17,7 +18,8 @@ import os
 ROLE_AUTHOR = "Sofibot.Autor"        # functionality 1: read the schema, write report drafts
 ROLE_REVIEWER = "Sofibot.Revisor"    # functionality 1: preview, publish or reject drafts
 ROLE_QUERY = "Sofibot.Consultas"     # functionality 2: query data
-ROLE_ADMIN = "Sofibot.Admin"         # administration page: status, permissions, documentation
+ROLE_ADMIN = "Sofibot.Admin"         # administration page: status, users, permissions, documentation
+FUNCTION_ROLES = (ROLE_AUTHOR, ROLE_REVIEWER, ROLE_QUERY, ROLE_ADMIN)
 ALL_TABLES = None                    # tables() for a caller restricted to no table set
 
 
@@ -102,10 +104,11 @@ def from_bearer(authorization: str, env=os.environ) -> Identity:
     email = claims.get("preferred_username") or claims.get("upn") or claims.get("unique_name") or ""
     if not email:
         raise IdentityError("Invalid token: no user name")
-    roles = tuple(sorted(role for role in claims.get("roles", []) if isinstance(role, str)))
-    return Identity(email=email, name=claims.get("name", ""), roles=roles)
+    from .access import roles_of
+
+    return Identity(email=email, name=claims.get("name", ""), roles=roles_of(email))
 
 
 def from_session(user: dict) -> Identity:
-    """The portal's signed-in user (auth.py session)."""
+    """The portal's signed-in user (auth.current_user, which already looked up the roles)."""
     return Identity(email=user.get("email", ""), name=user.get("name", ""), roles=tuple(user.get("roles", ())))

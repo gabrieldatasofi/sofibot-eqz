@@ -16,7 +16,7 @@ vista previa y lo publica, o lo rechaza con un comentario.
 - La API **no devuelve datos** ni acepta SQL, y lo que escribe **no se ejecuta**.
 - Cada persona entra con su cuenta de Microsoft: Sofibot sabe **quién** escribió, envió,
   previsualizó y publicó cada informe, y lo guarda en un registro.
-- El autor solo ve el esquema de **sus** tablas (las de sus roles en `reports/permisos.json`)
+- El autor solo ve el esquema de **sus** tablas (las de sus roles en `acceso/permisos.json`)
   y solo puede escribir informes sobre ellas. El revisor solo ve los borradores de sus tablas.
 
 Es la funcionalidad 1 de Sofibot. La funcionalidad 2, consultar datos, es un camino
@@ -24,14 +24,14 @@ separado: ver [11 · Consultas de datos](11-consultas.md).
 
 ## Roles
 
-Se crean en la aplicación de Entra ID de Sofibot ([09 · Inicio de sesión con Entra ID](09-inicio-sesion-entra.md#roles-de-las-funcionalidades)):
+Se dan a cada persona en **Administración → Usuarios** ([09 · Inicio de sesión con Entra ID](09-inicio-sesion-entra.md#roles-de-las-funcionalidades)):
 
 | Rol (valor) | Qué permite |
 |---|---|
 | `Sofibot.Autor` | Usar la API de informes: esquema y borradores de sus tablas |
 | `Sofibot.Revisor` | Página `/revision` del portal: vista previa, publicar o rechazar |
 
-Además, cada persona necesita uno o varios **roles de tablas** (`permisos.json`), como
+Además, cada persona necesita uno o varios **roles de datos** (con sus tablas en `acceso/permisos.json`), como
 para ver informes. Un revisor no puede publicar un borrador que haya enviado él mismo
 (salvo con `SOFIBOT_REVIEW_OWN=1`).
 

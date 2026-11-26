@@ -23,7 +23,7 @@ SQL Server y da acceso a sus datos**. Sofibot está diseñado para que ningún a
 vea esos datos ni esas credenciales fuera de los conectores aprobados.
 
 1. **Nunca leas, muestres, edites ni busques dentro de** `.env`, `.env.consultas`, `/etc/sofibot/`, `output/`,
-   `consultas/`, `reports/.admin/`, `caddy/certs/` ni ficheros `.xlsx`, `.csv`, `.sqlite` o
+   `consultas/`, `acceso/`, `reports/.admin/`, `caddy/certs/` ni ficheros `.xlsx`, `.csv`, `.sqlite` o
    `.bak`. Tampoco con otro comando (`cat`, `type`, `Get-Content`, `Select-String`, `grep`,
    `findstr`, `more`, scripts…). `.env.example` y `.env.consultas.example` sí puedes leerlos:
    son plantillas sin valores.

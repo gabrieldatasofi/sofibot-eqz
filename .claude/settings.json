@@ -16,6 +16,8 @@
       "Read(**/*.csv)",
       "Read(**/*.parquet)",
       "Read(**/*.bak)",
+      "Read(**/usuarios.json)",
+      "Read(**/.copias/**)",
       "Bash(sofibot build:*)",
       "Bash(sofibot check:*)",
       "Bash(docker compose run --rm sofibot sofibot build:*)",

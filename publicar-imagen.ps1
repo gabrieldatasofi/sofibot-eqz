@@ -65,12 +65,12 @@ $name = "sofibot-eqz-$Version"
 $dist = Join-Path $root 'dist-instalacion'
 $out = Join-Path $dist $name
 Remove-Item -Recurse -Force $out -ErrorAction SilentlyContinue
-foreach ($dir in 'caddy\certs', 'reports', 'output', 'consultas', 'sql', 'docs') { New-Item -ItemType Directory -Force (Join-Path $out $dir) | Out-Null }
+foreach ($dir in 'caddy\certs', 'reports', 'output', 'acceso', 'consultas', 'sql', 'docs') { New-Item -ItemType Directory -Force (Join-Path $out $dir) | Out-Null }
 foreach ($file in '.env.example', '.env.consultas.example', 'secretos.env.example', 'secretos-consultas.env.example', 'caddy\Caddyfile', 'sql\crear-login-lectura.sql') {
     Copy-Item (Join-Path $root $file) (Join-Path $out $file)
 }
 Copy-Item (Join-Path $root 'docs\*.md') (Join-Path $out 'docs')
-foreach ($keep in 'caddy\certs', 'reports', 'output', 'consultas') { New-Item -ItemType File -Force (Join-Path $out "$keep\.gitkeep") | Out-Null }
+foreach ($keep in 'caddy\certs', 'reports', 'output', 'acceso', 'consultas') { New-Item -ItemType File -Force (Join-Path $out "$keep\.gitkeep") | Out-Null }
 
 # compose.yaml del cliente: el del proyecto sin "build", con la imagen publicada fijada por su huella.
 $compose = (Get-Content (Join-Path $root 'compose.yaml') -Raw) -replace '(?m)^\s+build: \.\r?\n', ''

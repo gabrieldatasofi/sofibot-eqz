@@ -6,7 +6,10 @@
     sofibot new SLUG --name N --table gold.T   create a report project from the template
     sofibot list                        list report projects and built reports
     sofibot build SLUG [SLUG ...]       build reports into output/ (or --all)
-    sofibot permissions                 check reports/permisos.json (who sees which report)
+    sofibot users                       list acceso/usuarios.json (who has which roles)
+    sofibot users add EMAIL ROLE [...]  give a user roles (e.g. the first Sofibot.Admin)
+    sofibot users remove EMAIL [ROLE]   take roles away, or the user if no role is named
+    sofibot permissions                 check acceso/permisos.json (who sees which report)
     sofibot drafts                      list report drafts written through the API
     sofibot publish SLUG                copy a reviewed draft into reports/ (then build it)
     sofibot reject SLUG --comment C     send a draft back with a comment
@@ -111,8 +114,56 @@ def build(args) -> int:
     return 1 if failed else 0
 
 
+def users(args) -> int:
+    """Show or change acceso/usuarios.json. Prints e-mails and role names only: no data.
+
+    The way to name the first administrator, who then manages everyone else from the portal.
+    """
+    from .access import EMAIL, ROLE_NAME, PermissionsError, read_users, save_users, users_file
+    from .identity import FUNCTION_ROLES
+
+    path = users_file()
+    try:
+        current = {email: list(roles) for email, roles in read_users().items()} if path.is_file() else {}
+    except PermissionsError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    if args.action in ("add", "remove"):
+        email = args.email.strip().casefold()
+        if not EMAIL.fullmatch(email):
+            print(f"ERROR: '{args.email}' is not an e-mail address", file=sys.stderr)
+            return 2
+        if bad := [role for role in args.roles if not ROLE_NAME.fullmatch(role)]:
+            print(f"ERROR: invalid role names: {', '.join(bad)}", file=sys.stderr)
+            return 2
+        if args.action == "add":
+            if not args.roles:
+                print("ERROR: name at least one role, e.g. Sofibot.Admin", file=sys.stderr)
+                return 2
+            current[email] = sorted(set(current.get(email, [])) | set(args.roles))
+        elif email not in current:
+            print(f"ERROR: {email} is not in {path}", file=sys.stderr)
+            return 1
+        elif args.roles:
+            current[email] = sorted(set(current[email]) - set(args.roles))
+        else:
+            del current[email]
+        save_users(current)
+    print(f"{path}:")
+    for email, roles in sorted(current.items()):
+        print(f"  {email}: {', '.join(roles) or '(no roles)'}")
+    if not current:
+        print("  (nobody: add the first administrator with  sofibot users add EMAIL Sofibot.Admin)")
+    elif not any("Sofibot.Admin" in roles for roles in current.values()):
+        print("WARNING: nobody has Sofibot.Admin, so nobody can open the administration page", file=sys.stderr)
+    unknown = sorted({r for roles in current.values() for r in roles if r.startswith("Sofibot.") and r not in FUNCTION_ROLES})
+    if unknown:
+        print(f"WARNING: unknown function roles {', '.join(unknown)} (they are {', '.join(FUNCTION_ROLES)})", file=sys.stderr)
+    return 0
+
+
 def permissions(_args) -> int:
-    """Check reports/permisos.json against the report projects and the Gold schema contract.
+    """Check acceso/permisos.json against the report projects and the Gold schema contract.
 
     Prints role names, table names and report names only: no data.
     """
@@ -273,7 +324,12 @@ def main(argv=None) -> int:
     command.add_argument("slugs", nargs="*")
     command.add_argument("--all", action="store_true", help="build every project in reports/")
     command.set_defaults(run=build)
-    commands.add_parser("permissions", help="check reports/permisos.json (Entra ID sign-in)").set_defaults(run=permissions)
+    command = commands.add_parser("users", help="list or change acceso/usuarios.json (who has which roles)")
+    command.add_argument("action", nargs="?", choices=["list", "add", "remove"], default="list")
+    command.add_argument("email", nargs="?", default="")
+    command.add_argument("roles", nargs="*", help="role names, e.g. Sofibot.Admin Ventas")
+    command.set_defaults(run=users)
+    commands.add_parser("permissions", help="check acceso/permisos.json (Entra ID sign-in)").set_defaults(run=permissions)
     commands.add_parser("drafts", help="list report drafts written through the API").set_defaults(run=list_drafts)
     command = commands.add_parser("publish", help="copy a reviewed draft into reports/")
     command.add_argument("slug")

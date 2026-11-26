@@ -164,13 +164,14 @@ Con el servicio de consultas, igual con `secretos-consultas.env.example` →
 
 ```bash
 sed -i '/^SOFIBOT_UID=/d;/^SOFIBOT_GID=/d' .env
-mkdir -p consultas
-sudo chown -R 10001:10001 reports output consultas
-sudo chmod 700 output consultas
+mkdir -p acceso consultas
+sudo chown -R 10001:10001 reports output acceso consultas
+sudo chmod 700 output acceso consultas
 ```
 
-El contenedor usa su propio usuario (10001): los informes generados (`output/`) y el registro
-de consultas (`consultas/`) dejan de ser legibles para vuestro usuario. `reports/` sigue
+El contenedor usa su propio usuario (10001): los informes generados (`output/`), los usuarios
+y sus roles (`acceso/`) y el registro de consultas (`consultas/`) dejan de ser legibles para
+vuestro usuario. `reports/` sigue
 legible (código de los informes y estructura, sin datos), pero ya solo se modifica desde el
 portal o con `sudo`.
 
@@ -214,7 +215,7 @@ este orden, lo que explica con detalle [00 · Sofibot completo paso a paso](00-s
 | Parte | Quién | Qué |
 |---|---|---|
 | **A · HTTPS** | Sistemas | Un nombre en el DNS (por ejemplo `informes.empresa.local`), un certificado y el proxy activado, para entrar desde otros PCs |
-| **B · Entra ID** | Administrador de Entra ID | Una checklist: registrar la aplicación, secreto, roles, exponer la API, cliente público, consentimiento y asignar los roles a grupos |
+| **B · Entra ID** | Administrador de Entra ID | Una checklist: registrar la aplicación, secreto, exponer la API, cliente público y consentimiento. Entra ID solo valida el inicio de sesión: los roles se dan en Sofibot |
 | **C · Inicio de sesión e informes con IA** | Sistemas | Añadir al `.env` los datos de Entra ID y `docker compose up -d` |
 | **D · Consultas** | DBA, Sistemas y Datasofi | Segundo login (`sofibot_consultas`), `.env.consultas`, el catálogo de consultas que prepara Datasofi y activar el servicio |
 | **E · Permisos y usuarios** | Administrador de Sofibot | En el portal, **Administración → Permisos**: qué tablas ve cada rol. Después, cada usuario conecta su Claude o Codex desde **Conectar tu IA** |
@@ -230,7 +231,7 @@ Datasofi os entrega el paquete de la versión nueva:
 
 1. Descomprimidlo en otra carpeta y copiad **solo** su `compose.yaml` encima del vuestro
    (y `docs/`, si queréis la documentación nueva). **No toquéis** `.env`, `.env.consultas`,
-   `reports/`, `output/`, `consultas/` ni `caddy/certs/`: son vuestros.
+   `reports/`, `output/`, `acceso/`, `consultas/` ni `caddy/certs/`: son vuestros.
 2. Descargad y arrancad:
 
    ```bash

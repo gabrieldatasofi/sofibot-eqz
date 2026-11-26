@@ -61,7 +61,9 @@ Solo con `SOFIBOT_AUTH=entra`. Ver [09 · Inicio de sesión con Entra ID](09-ini
 | `SOFIBOT_SESSION_HOURS` | `8` | Horas que dura la sesión antes de volver a pasar por Microsoft |
 | `HTTPS_PROXY` | — | Proxy de salida a internet, si lo hay, para llegar a `login.microsoftonline.com` |
 
-Qué tablas Gold ve cada rol: `reports/permisos.json`.
+Entra ID solo valida el inicio de sesión. Los roles de cada persona están en `acceso/usuarios.json` y
+las tablas Gold de cada rol de datos en `acceso/permisos.json` (los dos se editan en Administración;
+la carpeta se cambia con `SOFIBOT_ACCESS_DIR`, por defecto `acceso/`).
 
 ## Docker (`compose.yaml`)
 
@@ -69,7 +71,7 @@ Qué tablas Gold ve cada rol: `reports/permisos.json`.
 |---|---|---|
 | `SOFIBOT_BIND` | `127.0.0.1` | Interfaz donde se publica el portal. `0.0.0.0` = todas |
 | `SOFIBOT_PORT` | `8080` | Puerto del portal en el servidor |
-| `SOFIBOT_UID`, `SOFIBOT_GID` | `10001` | Usuario y grupo con el que se ejecuta el contenedor (dueño de `reports/`, `output/` y `consultas/`) |
+| `SOFIBOT_UID`, `SOFIBOT_GID` | `10001` | Usuario y grupo con el que se ejecuta el contenedor (dueño de `reports/`, `output/`, `acceso/` y `consultas/`) |
 | `SOFIBOT_QUERY_PORT` | `8081` | Puerto del servicio de consultas en el servidor (perfil `consultas`) |
 
 ## Proxy HTTPS

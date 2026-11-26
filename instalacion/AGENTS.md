@@ -5,7 +5,7 @@ empresa y da acceso a sus datos. Antes de hacer nada, lee `INSTALAR-CON-IA.md` y
 reglas, también después de la instalación. En resumen:
 
 - Nunca leas, muestres, edites ni busques dentro de `.env`, `.env.consultas`, `/etc/sofibot/`, `output/`,
-  `consultas/`, `reports/.admin/`, `caddy/certs/` ni ficheros `.xlsx`, `.csv`, `.sqlite` o `.bak`.
+  `consultas/`, `acceso/`, `reports/.admin/`, `caddy/certs/` ni ficheros `.xlsx`, `.csv`, `.sqlite` o `.bak`.
 - Nunca ejecutes nada contra la base de datos ni dentro de los contenedores: ni `sqlcmd`, ni
   SQL, ni `docker compose run`, `docker run`, `docker exec`, `docker compose exec`, `docker cp`,
   `docker compose config`, `docker inspect` o los logs. Esos pasos los ejecuta la persona.

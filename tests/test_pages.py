@@ -179,15 +179,19 @@ def test_admin_edits_permissions(admin, folders):
     data = {"csrf": csrf(form.text), "count": "2", "role0": "Ventas", "tables0": ["gold.ventas", "gold.costes"],
             "role1": "Direccion", "tables1": ["*", "gold.ventas"]}
     assert admin.post("/admin/permisos", data=data).status_code == 303
-    saved = json.loads((folders / "reports" / "permisos.json").read_text())
+    saved = json.loads((folders / "acceso" / "permisos.json").read_text())     # moves to acceso/
     assert saved == {"roles": {"Ventas": ["gold.costes", "gold.ventas"], "Direccion": ["*"]}}
-    assert list((folders / "reports" / ".admin").glob("permisos-*.json"))       # previous file kept
+    assert "reports/permisos.json" not in admin.get("/admin/permisos").text      # no "older installation" notice
+    assert admin.post("/admin/permisos", data=data).status_code == 303
+    assert list((folders / "acceso" / ".copias").glob("permisos-*.json"))       # previous file kept
     bad = admin.post("/admin/permisos", data={**data, "role1": "Con espacios"})
     assert "No se ha guardado" in admin.get(bad.headers["location"]).text
     assert admin.post("/admin/permisos", data={**data, "csrf": "forged"}).status_code == 403
     deleted = admin.post("/admin/permisos", data={**data, "delete1": "1"})
     assert deleted.status_code == 303
-    assert list(json.loads((folders / "reports" / "permisos.json").read_text())["roles"]) == ["Ventas"]
+    assert list(json.loads((folders / "acceso" / "permisos.json").read_text())["roles"]) == ["Ventas"]
+    function_role = admin.post("/admin/permisos", data={**data, "role1": identity.ROLE_AUTHOR})
+    assert "rol de funcionalidad" in admin.get(function_role.headers["location"]).text
 
 
 def test_admin_documentation(admin):
@@ -196,3 +200,36 @@ def test_admin_documentation(admin):
     assert 'href="/admin/docs/06-seguridad.md#datos"' in page and "<table>" in page
     assert "../examples" not in page
     assert admin.get("/admin/docs/..%2F..%2Fsecret.md").status_code in (403, 404)
+
+
+def test_admin_edits_users(admin, folders):
+    form = admin.get("/admin/usuarios")
+    assert form.status_code == 200 and "ana@empresa.test" in form.text and "Ventas" in form.text
+    data = {"csrf": csrf(form.text), "count": "2", "email0": "ana@empresa.test", "roles0": [identity.ROLE_ADMIN],
+            "email1": " Luis@Empresa.test ", "roles1": [identity.ROLE_QUERY, "Ventas"]}
+    assert admin.post("/admin/usuarios", data=data).status_code == 303
+    saved = json.loads((folders / "acceso" / "usuarios.json").read_text())
+    assert saved == {"usuarios": {"ana@empresa.test": [identity.ROLE_ADMIN],
+                                  "luis@empresa.test": [identity.ROLE_QUERY, "Ventas"]}}
+    assert "luis@empresa.test" in admin.get("/admin/usuarios").text and "ventas" in admin.get("/admin/usuarios").text
+    bad = admin.post("/admin/usuarios", data={**data, "email1": "no es un correo"})
+    assert "Correo no válido" in admin.get(bad.headers["location"]).text
+    assert admin.post("/admin/usuarios", data={**data, "csrf": "forged"}).status_code == 403
+    deleted = admin.post("/admin/usuarios", data={**data, "delete1": "1"})
+    assert deleted.status_code == 303 and list(json.loads((folders / "acceso" / "usuarios.json").read_text())["usuarios"]) == ["ana@empresa.test"]
+    assert list((folders / "acceso" / ".copias").glob("usuarios-*.json"))
+
+
+def test_admin_cannot_remove_their_own_admin_role(admin, folders):
+    form = admin.get("/admin/usuarios")
+    for data in ({"email0": "ana@empresa.test", "roles0": ["Ventas"]}, {"email0": "ana@empresa.test", "delete0": "1"}):
+        response = admin.post("/admin/usuarios", data={"csrf": csrf(form.text), "count": "1", **data})
+        assert "No puedes quitarte" in admin.get(response.headers["location"]).text
+    assert admin.get("/admin").status_code == 200
+
+
+def test_a_role_change_applies_without_signing_in_again(admin, folders):
+    from conftest import grant
+
+    grant("ana@empresa.test", ["Ventas"])
+    assert admin.get("/admin").status_code == 403

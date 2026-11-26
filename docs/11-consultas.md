@@ -13,7 +13,7 @@ permisos, construye la consulta él mismo y registra quién preguntó qué y có
 
 Es la funcionalidad 2 de Sofibot, separada de la 1 (crear informes, [10 · API de informes](10-api-informes.md)):
 comparten solo el inicio de sesión con Entra ID y los permisos por tabla de
-`reports/permisos.json`. Todo lo demás es propio: contenedor, configuración
+`acceso/` (usuarios, roles y permisos). Todo lo demás es propio: contenedor, configuración
 (`.env.consultas`), login de SQL Server, registro y esta documentación.
 
 Se pregunta de dos formas, las dos por la misma API y con los mismos permisos:
@@ -31,7 +31,7 @@ Se pregunta de dos formas, las dos por la misma API y con los mismos permisos:
 - **Catálogo semántico** (`reports/catalogo.json`): qué se puede preguntar a cada tabla.
   La API no acepta SQL: solo nombres del catálogo.
 - **Permisos**: el usuario necesita el rol `Sofibot.Consultas` y solo consulta las tablas
-  de sus roles en `permisos.json`. Las demás tablas no existen para él.
+  de sus roles en `acceso/permisos.json`. Las demás tablas no existen para él.
 - **Límites**: filas por consulta (`SOFIBOT_QUERY_MAX_ROWS`), tiempo por consulta
   (`SQLSERVER_QUERY_TIMEOUT`) y consultas por minuto y usuario (`SOFIBOT_QUERY_PER_MINUTE`).
 - **Registro** (`consultas/registro.sqlite`): cada consulta y cada pregunta, con el usuario
@@ -83,7 +83,7 @@ el esquema (funcionalidad 1) y lo revisa una persona. Ejemplo completo:
 1. **Login de SQL Server propio.** Ejecutar `sql/crear-login-lectura.sql` con
    `@login = N'sofibot_consultas'` (otra contraseña). Es de solo lectura, como el del portal,
    pero separado: se puede revocar o limitar sin tocar los informes.
-2. **Roles en Entra ID**: `Sofibot.Consultas` y la API expuesta
+2. **Rol `Sofibot.Consultas`** en Administración → Usuarios y la API expuesta en Entra ID
    ([09 · Inicio de sesión con Entra ID](09-inicio-sesion-entra.md#roles-de-las-funcionalidades)).
 3. **Configuración propia**: `cp .env.consultas.example .env.consultas` y rellenarlo
    (servidor, login del paso 1, `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`).

@@ -2,11 +2,13 @@
 
 - /admin           status: SQL Server and the Gold schema contract, Entra ID, the two
                    functionalities and their MCP servers, permissions, versions
-- /admin/permisos  edit reports/permisos.json (role -> Gold tables) from the browser
+- /admin/usuarios  edit acceso/usuarios.json (user -> roles): who may do what
+- /admin/permisos  edit acceso/permisos.json (data role -> Gold tables)
 - /admin/docs      the technical documentation shipped with this version (docs/*.md)
 
-Shows configuration and structure, never data and never secret values. Every change is
-logged with the administrator's e-mail and the previous permissions file is kept.
+Entra ID only signs users in; roles are given here (access.py). Shows configuration and
+structure, never data and never secret values. Every change is logged with the
+administrator's e-mail and the previous file is kept in acceso/.copias/.
 """
 from contextlib import closing
 from datetime import datetime, timezone
@@ -29,7 +31,7 @@ from .identity import ROLE_ADMIN, ROLE_AUTHOR, ROLE_QUERY, ROLE_REVIEWER
 
 log = logging.getLogger("sofibot")
 router = APIRouter(prefix="/admin")
-ROLE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+ROLE_NAME = access.ROLE_NAME
 FUNCTION_ROLES = {ROLE_AUTHOR: "Escribir informes con un asistente de IA (funcionalidad 1)",
                   ROLE_REVIEWER: "Revisar, previsualizar y publicar borradores (funcionalidad 1)",
                   ROLE_QUERY: "Consultar datos (funcionalidad 2)",
@@ -178,7 +180,8 @@ def entra_section(who: identity.Identity) -> str:
     roles = "".join(f"<tr><td><code>{escape(r)}</code></td><td>{escape(d)}</td></tr>" for r, d in FUNCTION_ROLES.items())
     return f"""<h2 id="entra">Microsoft Entra ID</h2>
 <table>{"".join(f"<tr><th>{escape(k)}</th><td>{v}</td></tr>" for k, v in rows)}</table>
-<p class="meta">Tus roles: {escape(mine)}. Los roles se asignan en Entra ID (docs/09-inicio-sesion-entra.md).</p>
+<p class="meta">Entra ID solo valida el inicio de sesión. Tus roles en Sofibot: {escape(mine)}. Los roles se
+asignan en <a href="/admin/usuarios">Usuarios</a>.</p>
 <h3>Roles de las funcionalidades</h3><table><tr><th>Rol</th><th>Para</th></tr>{roles}</table>"""
 
 
@@ -248,10 +251,13 @@ async def status_page(request: Request, comprobar: str = "", mensaje: str = ""):
     body = f"""<h1>Administración</h1>{ui.notice(mensaje) if mensaje else ""}
 <p class="meta">Sofibot {__version__} · Python {platform.python_version()} · inicio de sesión {auth.mode()}.
 <a href="#sql">SQL Server</a> · <a href="#entra">Entra ID</a> · <a href="#informes">Informes</a> ·
-<a href="#consultas">Consultas</a> · <a href="/conectar">MCP</a> · <a href="/admin/permisos">Permisos</a> ·
+<a href="#consultas">Consultas</a> · <a href="/conectar">MCP</a> · <a href="/admin/usuarios">Usuarios</a> ·
+<a href="/admin/permisos">Permisos</a> ·
 <a href="/admin/docs">Documentación</a></p>
-<div class="cards"><article class="card"><h3>Permisos de usuarios</h3><p>Qué tablas Gold ve cada rol de Entra ID.</p>
-<div class="actions"><a class="button primary" href="/admin/permisos">Editar permisos</a></div></article>
+<div class="cards"><article class="card"><h3>Usuarios</h3><p>Quién entra en Sofibot y con qué roles.</p>
+<div class="actions"><a class="button primary" href="/admin/usuarios">Editar usuarios</a></div></article>
+<article class="card"><h3>Permisos por tabla</h3><p>Qué tablas Gold da cada rol de datos.</p>
+<div class="actions"><a class="button" href="/admin/permisos">Editar permisos</a></div></article>
 <article class="card"><h3>Conectores MCP</h3><p>Configuración para Claude y Codex de las dos funcionalidades.</p>
 <div class="actions"><a class="button" href="/conectar">Ver configuración</a></div></article>
 <article class="card"><h3>Documentación técnica</h3><p>Arquitectura, instalación, seguridad, Entra ID, APIs.</p>
@@ -318,18 +324,22 @@ def permissions_page(request: Request, mensaje: str = ""):
         granted = {t.casefold() for t in roles.get(role, [])}
         name = (f'<input type="hidden" name="role{index}" value="{escape(role)}"><b>{escape(role)}</b>'
                 f'<br><label class="meta"><input type="checkbox" name="delete{index}" value="1"> quitar</label>') if role else \
-            f'<input type="text" name="role{index}" placeholder="Nuevo rol (valor en Entra ID)">'
+            f'<input type="text" name="role{index}" placeholder="Nuevo rol de datos">'
         cells = f'<td><input type="checkbox" name="tables{index}" value="*"{" checked" if access.ALL in granted else ""}></td>'
         cells += "".join(f'<td><input type="checkbox" name="tables{index}" value="{escape(t)}"'
                          f'{" checked" if t in granted else ""} aria-label="{escape(role)} {escape(t)}"></td>' for t in tables)
         seen = [slug for slug, ts in reports.items() if role and access.covers(granted, ts)]
         rows.append(f"<tr><td>{name}</td>{cells}<td class='meta'>{escape(', '.join(seen)) or '—'}</td></tr>")
-    body = f"""<h1>Permisos de usuarios</h1>{ui.notice(mensaje) if mensaje else ""}
-<p>Cada fila es un <b>rol de Entra ID</b> (su valor exacto) y las tablas Gold que puede tocar. Una persona con varios
-roles suma sus tablas. Se aplica a todo: ver informes, crear informes (esquema visible) y consultar datos. Los cambios
-se aplican al momento, sin reiniciar; el fichero anterior se guarda.</p>
-<p class="meta">Los roles de funcionalidad ({", ".join(FUNCTION_ROLES)}) no van aquí: dan acceso a cada funcionalidad
-y se asignan en Entra ID.</p>
+    legacy = access.permissions_file() == access.legacy_permissions_file()
+    body = f"""<h1>Permisos por tabla</h1>{ui.notice(mensaje) if mensaje else ""}
+<p>Cada fila es un <b>rol de datos</b> y las tablas Gold que puede tocar. Los roles se dan a cada persona en
+<a href="/admin/usuarios">Usuarios</a>; una persona con varios roles suma sus tablas. Se aplica a todo: ver informes,
+crear informes (esquema visible) y consultar datos. Los cambios se aplican al momento, sin reiniciar; el fichero
+anterior se guarda.</p>
+<p class="meta">Los roles de funcionalidad ({", ".join(FUNCTION_ROLES)}) no van aquí: dan acceso a cada
+funcionalidad, no a tablas.</p>
+{ui.notice("Estos permisos están todavía en reports/permisos.json (instalación anterior). Al guardar pasan a "
+           "acceso/permisos.json, que es el que se usará desde entonces.") if legacy else ""}
 <form method="post" action="/admin/permisos"><input type="hidden" name="csrf" value="{escape(csrf_token(request))}">
 <div class="scroll"><table><tr><th>Rol</th><th>Todas (*)</th>{head}<th>Informes que ve</th></tr>{"".join(rows)}</table></div>
 <input type="hidden" name="count" value="{len(roles) + 1}">
@@ -355,6 +365,9 @@ async def save_permissions(request: Request):
         if not ROLE_NAME.fullmatch(role):
             problems.append(f"Nombre de rol no válido: {role}")
             continue
+        if role in FUNCTION_ROLES:
+            problems.append(f"{role} es un rol de funcionalidad: no lleva tablas")
+            continue
         chosen = sorted(set(fields.get(f"tables{index}", [])))
         if unknown := [t for t in chosen if schema and t not in known]:
             problems.append(f"{role}: tablas desconocidas {', '.join(unknown)}")
@@ -362,21 +375,99 @@ async def save_permissions(request: Request):
         roles[role] = [access.ALL] if access.ALL in chosen else chosen
     if problems:
         return RedirectResponse(f"/admin/permisos?mensaje={quote('No se ha guardado. ' + '; '.join(problems))}", 303)
-    path = access.permissions_file()
-    previous = path.read_text(encoding="utf-8") if path.is_file() else None
-    if previous is not None:
-        backup = config.REPORTS_DIR / ".admin" / f"permisos-{datetime.now():%Y%m%d-%H%M%S}.json"
-        backup.parent.mkdir(parents=True, exist_ok=True)
-        backup.write_text(previous, encoding="utf-8")
-    path.write_text(json.dumps({"roles": roles}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     try:
-        access.read()
-    except access.PermissionsError as exc:
-        if previous is not None:
-            path.write_text(previous, encoding="utf-8")
+        access.save_permissions(roles)
+    except (OSError, access.PermissionsError) as exc:
         return RedirectResponse(f"/admin/permisos?mensaje={quote(f'No se ha guardado: {exc}')}", 303)
     record(who.email, "permisos", json.dumps(roles, ensure_ascii=False))
     return RedirectResponse(f"/admin/permisos?mensaje={quote('Permisos guardados.')}", 303)
+
+
+# --- Users --------------------------------------------------------------------------------
+
+def current_users() -> tuple[dict[str, tuple[str, ...]], str]:
+    """Users and roles, plus a problem to show if the file is broken (then the page starts empty)."""
+    if not access.users_file().is_file():
+        return {}, ""
+    try:
+        return access.read_users(), ""
+    except access.PermissionsError as exc:
+        return {}, f"El fichero de usuarios no es válido y nadie tiene roles hasta corregirlo: {exc}"
+
+
+@router.get("/usuarios", response_class=HTMLResponse)
+def users_page(request: Request, mensaje: str = ""):
+    try:
+        administrator(request)
+    except HTTPException as exc:
+        return refused(request, exc)
+    users, problem = current_users()
+    permissions = access.load()
+    data_roles = sorted(set(permissions) | {r for rs in users.values() for r in rs if r not in FUNCTION_ROLES})
+    columns = list(FUNCTION_ROLES) + data_roles
+    head = "".join(f'<th title="{escape(FUNCTION_ROLES.get(r, "Rol de datos"))}">'
+                   f'{escape(r.removeprefix("Sofibot."))}</th>' for r in columns)
+    rows = []
+    for index, email in enumerate(sorted(users) + [""]):
+        mine = set(users.get(email, ()))
+        if email:
+            name = (f'<input type="hidden" name="email{index}" value="{escape(email)}"><b>{escape(email)}</b>'
+                    f'<br><label class="meta"><input type="checkbox" name="delete{index}" value="1"> quitar</label>')
+        else:
+            name = f'<input type="email" name="email{index}" placeholder="correo de Microsoft de la persona">'
+        cells = "".join(f'<td><input type="checkbox" name="roles{index}" value="{escape(r)}"'
+                        f'{" checked" if r in mine else ""} aria-label="{escape(email)} {escape(r)}"></td>' for r in columns)
+        tables = access.granted(mine, permissions)
+        summary = "todas" if access.ALL in tables else ", ".join(sorted(t.split(".", 1)[-1] for t in tables))
+        if unknown := sorted(r for r in mine if r not in FUNCTION_ROLES and r not in permissions):
+            summary += f" (sin tablas en Permisos: {', '.join(unknown)})"
+        rows.append(f"<tr><td>{name}</td>{cells}<td class='meta'>{escape(summary) or '—'}</td></tr>")
+    functions = "; ".join(f"<code>{escape(r)}</code>: {escape(d)}" for r, d in FUNCTION_ROLES.items())
+    body = f"""<h1>Usuarios</h1>{ui.notice(mensaje) if mensaje else ""}{ui.notice(problem) if problem else ""}
+<p>Microsoft Entra ID solo valida el inicio de sesión: dice quién es cada persona. Lo que puede hacer en Sofibot
+se decide aquí. Cada fila es una persona, por su <b>correo de Microsoft</b> (con el que inicia sesión), y sus roles:</p>
+<ul><li><b>Roles de funcionalidad</b>, qué puede hacer. {functions}.</li>
+<li><b>Roles de datos</b>, qué tablas Gold ve: se definen en <a href="/admin/permisos">Permisos por tabla</a>.</li></ul>
+<p class="meta">Quien no está en esta lista puede iniciar sesión pero no ve nada. Los cambios se aplican al momento,
+sin volver a iniciar sesión; el fichero anterior se guarda.</p>
+<form method="post" action="/admin/usuarios"><input type="hidden" name="csrf" value="{escape(csrf_token(request))}">
+<div class="scroll"><table><tr><th>Usuario</th>{head}<th>Tablas que ve</th></tr>{"".join(rows)}</table></div>
+<input type="hidden" name="count" value="{len(users) + 1}">
+<div class="actions"><button class="primary">Guardar usuarios</button>
+<a class="button" href="/admin">Volver</a></div></form>"""
+    return ui.page(request, "Usuarios", body, active="admin")
+
+
+@router.post("/usuarios")
+async def save_users(request: Request):
+    try:
+        who = administrator(request)
+        fields = await posted(request)
+    except HTTPException as exc:
+        return refused(request, exc)
+    users, problems = {}, []
+    for index in range(int((fields.get("count") or ["0"])[0] or 0)):
+        email = (fields.get(f"email{index}") or [""])[0].strip().casefold()
+        if not email or (fields.get(f"delete{index}") or [""])[0] == "1":
+            continue
+        if not access.EMAIL.fullmatch(email):
+            problems.append(f"Correo no válido: {email}")
+            continue
+        roles = sorted(set(fields.get(f"roles{index}", [])))
+        if bad := [r for r in roles if not ROLE_NAME.fullmatch(r)]:
+            problems.append(f"{email}: roles no válidos {', '.join(bad)}")
+            continue
+        users[email] = roles
+    if ROLE_ADMIN not in users.get(who.email.casefold(), []):
+        problems.append(f"No puedes quitarte a ti mismo el rol {ROLE_ADMIN}: que lo haga otro administrador")
+    if problems:
+        return RedirectResponse(f"/admin/usuarios?mensaje={quote('No se ha guardado. ' + '; '.join(problems))}", 303)
+    try:
+        access.save_users(users)
+    except (OSError, access.PermissionsError) as exc:
+        return RedirectResponse(f"/admin/usuarios?mensaje={quote(f'No se ha guardado: {exc}')}", 303)
+    record(who.email, "usuarios", json.dumps(users, ensure_ascii=False))
+    return RedirectResponse(f"/admin/usuarios?mensaje={quote('Usuarios guardados.')}", 303)
 
 
 # --- Documentation ------------------------------------------------------------------------

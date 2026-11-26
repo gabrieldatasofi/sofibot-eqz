@@ -65,7 +65,7 @@ def explore(request: Request):
     elif not entra:
         query_card = '<p class="meta">Las consultas necesitan el inicio de sesión con Microsoft Entra ID.</p>'
     else:
-        query_card = '<p class="meta">Tu usuario no tiene el rol de consultas (Sofibot.Consultas). Pídelo a sistemas.</p>'
+        query_card = '<p class="meta">Tu usuario no tiene el rol de consultas (Sofibot.Consultas). Pídelo a un administrador de Sofibot.</p>'
     greeting = f"Hola, {escape(who.name.split(' ')[0])}" if entra and who.name else "Explorar Sofibot"
     body = f"""<h1>{greeting}</h1><p class="meta">Qué puedes hacer con Sofibot según tus permisos.</p>
 <div class="cards">
@@ -106,7 +106,7 @@ def reports_page(request: Request):
     elif who is None:
         listing = "<p>Todavía no hay informes generados. Ver <code>docs/04-crear-informes.md</code>.</p>"
     else:
-        listing = "<p>No tienes acceso a ningún informe. Si lo necesitas, pide acceso a sistemas.</p>"
+        listing = "<p>No tienes acceso a ningún informe. Si lo necesitas, pide acceso a un administrador de Sofibot.</p>"
     body = f"<h1>Informes</h1><p class='meta'>Los informes publicados que puedes ver.</p>{listing}{create_section(who)}"
     return ui.page(request, "Informes", body, active="informes")
 
@@ -116,7 +116,7 @@ def create_section(who) -> str:
         return ""
     if who is not None and ROLE_AUTHOR not in who.roles:
         return ('<h2 id="crear">Crear informes</h2><p class="meta">Para crear informes con tu asistente de IA '
-                'necesitas el rol de autor (Sofibot.Autor). Pídelo a sistemas.</p>')
+                'necesitas el rol de autor (Sofibot.Autor). Pídelo a un administrador de Sofibot.</p>')
     rows = []
     for draft in drafts.list_drafts():
         if who is not None and who.email not in (draft.get("created_by"), draft.get("submitted_by")):
@@ -172,7 +172,7 @@ def queries_page(request: Request):
     if who is None:
         return show("Las consultas necesitan el inicio de sesión con Microsoft Entra ID.")
     if ROLE_QUERY not in who.roles:
-        return show("Tu usuario no tiene el rol de consultas (Sofibot.Consultas). Pídelo a sistemas.")
+        return show("Tu usuario no tiene el rol de consultas (Sofibot.Consultas). Pídelo a un administrador de Sofibot.")
     token = auth.api_token(request)
     if token is None:
         return show("Tu sesión para consultas ha caducado.",
@@ -338,7 +338,7 @@ def connect_page(request: Request):
         mine.append("consultar datos de tus tablas (tu IA recibe los resultados)")
     if not mine:
         body = ("<h1>Conectar tu IA</h1>" + ui.notice(
-            "Tu usuario no tiene ningún conector disponible: pide a sistemas el rol de autor de informes "
+            "Tu usuario no tiene ningún conector disponible: pide a un administrador de Sofibot el rol de autor de informes "
             "(Sofibot.Autor) o de consultas (Sofibot.Consultas)."))
         return ui.page(request, "Conectar tu IA", body, active="conectar")
     ais = "".join(f'<article class="card"><h3>{escape(name)}</h3><p>{escape(text)}</p>'

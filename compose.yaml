@@ -18,6 +18,7 @@ services:
     volumes:
       - ./reports:/app/reports
       - ./output:/app/output
+      - ./acceso:/app/acceso      # usuarios.json y permisos.json: quién puede hacer qué
     extra_hosts:
       # Permite usar SQLSERVER_HOST=host.docker.internal para un SQL Server instalado en el propio equipo.
       - "host.docker.internal:host-gateway"
@@ -40,7 +41,8 @@ services:
     ports:
       - "${SOFIBOT_BIND:-127.0.0.1}:${SOFIBOT_QUERY_PORT:-8081}:8080"
     volumes:
-      - ./reports:/app/reports:ro     # catalogo.json y permisos.json, solo lectura
+      - ./reports:/app/reports:ro     # catalogo.json, solo lectura
+      - ./acceso:/app/acceso:ro       # usuarios.json y permisos.json, solo lectura
       - ./consultas:/app/consultas    # registro de preguntas y consultas
     extra_hosts:
       - "host.docker.internal:host-gateway"

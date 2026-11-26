@@ -36,8 +36,12 @@ Con `SOFIBOT_AUTH=entra`:
 
 - cada persona entra con su cuenta de la empresa, con la MFA y el acceso condicional que
   tenga configurados Entra ID;
-- solo entran las personas con un rol asignado en la aplicación de Entra ID;
-- los permisos se dan por **tabla Gold** (`reports/permisos.json`): cada persona solo ve
+- Entra ID valida quién inicia sesión (y, si se exige asignación, solo deja entrar a las
+  personas o grupos asignados);
+- Sofibot decide qué puede hacer cada persona: sus roles están en `acceso/usuarios.json` y
+  se dan desde **Administración → Usuarios**, con registro de cada cambio; quien no está ahí
+  no ve nada;
+- los permisos se dan por **tabla Gold** (`acceso/permisos.json`): cada persona solo ve
   los informes cuyas tablas tiene todas permitidas. Lo que no está permitido no se ve, ni en
   el portal ni por su dirección directa;
 - cada informe declara en su `report.json` las tablas que lee, y el build falla si una

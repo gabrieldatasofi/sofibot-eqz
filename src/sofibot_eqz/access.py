@@ -1,11 +1,19 @@
-"""Who sees which report when users sign in with Microsoft Entra ID (docs/09-inicio-sesion-entra.md).
+"""Who may do what when users sign in with Microsoft Entra ID (docs/09-inicio-sesion-entra.md).
 
-Permissions are granted on Gold tables. Entra puts the user's app roles in the sign-in token;
-reports/permisos.json maps each role to the Gold tables it may see ("*" = all). A report is
-visible when the user's roles, together, cover every table the report reads (its report.json
-"tables"): a report is built in advance for everyone, so it cannot show only part of itself.
-The file is read on every request, so a change applies without restarting the portal.
+Entra ID only signs users in: it says who the user is (their e-mail), nothing else. Sofibot
+decides what they may do, with two files in the acceso/ folder:
+
+- usuarios.json: each user's roles, by e-mail. Function roles (Sofibot.Autor, ...) open each
+  functionality; data roles (any other name) give Gold tables.
+- permisos.json: each data role's Gold tables ("*" = all).
+
+A report is visible when the user's roles, together, cover every table the report reads (its
+report.json "tables"): a report is built in advance for everyone, so it cannot show only part
+of itself. Both files are read on every request, so a change applies without restarting and
+without signing in again. Installations from before acceso/ keep reports/permisos.json until
+the permissions are first saved from the administration page.
 """
+from datetime import datetime
 import json
 import logging
 import os
@@ -15,6 +23,8 @@ from . import config
 
 ALL = "*"
 TABLE = re.compile(r"\w+\.\w+")
+ROLE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+EMAIL = re.compile(r"[^@\s\"<>]+@[^@\s\"<>]+")
 log = logging.getLogger("sofibot")
 
 
@@ -22,19 +32,97 @@ class PermissionsError(Exception):
     pass
 
 
-def permissions_file():
+# --- Files --------------------------------------------------------------------------------
+
+def users_file():
+    return config.ACCESS_DIR / "usuarios.json"
+
+
+def legacy_permissions_file():
     return config.REPORTS_DIR / "permisos.json"
 
 
-def read() -> dict[str, set[str]]:
-    """Role -> Gold tables (lower case) or {"*"}. Raises PermissionsError if missing or malformed."""
-    path = permissions_file()
+def permissions_file():
+    """acceso/permisos.json; reports/permisos.json only while an older installation has no new file."""
+    path = config.ACCESS_DIR / "permisos.json"
+    legacy = legacy_permissions_file()
+    return legacy if not path.is_file() and legacy.is_file() else path
+
+
+def save(path, data: dict, check) -> None:
+    """Write a JSON file, keeping the previous one in acceso/.copias/; restore it if check() fails."""
+    previous = path.read_text(encoding="utf-8") if path.is_file() else None
+    if previous is not None:
+        backup = config.ACCESS_DIR / ".copias" / f"{path.stem}-{datetime.now():%Y%m%d-%H%M%S-%f}.json"
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        backup.write_text(previous, encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        check()
+    except PermissionsError:
+        if previous is None:
+            path.unlink()
+        else:
+            path.write_text(previous, encoding="utf-8")
+        raise
+
+
+def _json(path) -> object:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
         raise PermissionsError(f"{path} does not exist") from exc
     except (OSError, ValueError) as exc:
         raise PermissionsError(f"{path}: {exc}") from exc
+
+
+# --- Users: e-mail -> roles ---------------------------------------------------------------
+
+def read_users() -> dict[str, tuple[str, ...]]:
+    """E-mail (lower case) -> roles. Raises PermissionsError if missing or malformed."""
+    path = users_file()
+    data = _json(path)
+    users = data.get("usuarios") if isinstance(data, dict) else None
+    if not isinstance(users, dict):
+        raise PermissionsError(f'{path}: expected {{"usuarios": {{"<e-mail>": ["<role>", ...]}}}}')
+    result = {}
+    for email, roles in users.items():
+        key = email.strip().casefold()
+        if not EMAIL.fullmatch(key):
+            raise PermissionsError(f'{path}: "{email}" is not an e-mail address')
+        if key in result:
+            raise PermissionsError(f'{path}: "{email}" appears twice')
+        if not isinstance(roles, list) or not all(isinstance(r, str) and ROLE_NAME.fullmatch(r) for r in roles):
+            raise PermissionsError(f'{path}: "{email}" must map to a list of role names')
+        result[key] = tuple(sorted(set(roles)))
+    return result
+
+
+def load_users() -> dict[str, tuple[str, ...]]:
+    """Like read_users(), but a missing or broken file gives nobody any role instead of failing."""
+    try:
+        return read_users()
+    except PermissionsError as exc:
+        log.warning("Users: %s. Signed-in users have no roles until it is fixed.", exc)
+        return {}
+
+
+def roles_of(email: str) -> tuple[str, ...]:
+    """The roles Sofibot gives this signed-in user (none if they are not in usuarios.json)."""
+    return load_users().get((email or "").strip().casefold(), ())
+
+
+def save_users(users: dict[str, list[str]]) -> None:
+    save(users_file(), {"usuarios": {email: sorted(set(roles)) for email, roles in sorted(users.items())}}, read_users)
+
+
+# --- Permissions: data role -> Gold tables ------------------------------------------------
+
+def read() -> dict[str, set[str]]:
+    """Role -> Gold tables (lower case) or {"*"}. Raises PermissionsError if missing or malformed."""
+    path = permissions_file()
+    data = _json(path)
     roles = data.get("roles") if isinstance(data, dict) else None
     if not isinstance(roles, dict):
         raise PermissionsError(f'{path}: expected {{"roles": {{"<role>": ["gold.<table>", ...]}}}}')
@@ -56,6 +144,13 @@ def load() -> dict[str, set[str]]:
     except PermissionsError as exc:
         log.warning("Permissions: %s. Signed-in users see no reports until it is fixed.", exc)
         return {}
+
+
+def save_permissions(roles: dict[str, list[str]]) -> None:
+    """Always into acceso/: from then on an older reports/permisos.json is no longer read."""
+    config.ACCESS_DIR.mkdir(parents=True, exist_ok=True)
+    path = config.ACCESS_DIR / "permisos.json"
+    save(path, {"roles": roles}, read)
 
 
 def granted(roles, permissions: dict[str, set[str]]) -> set[str]:

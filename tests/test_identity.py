@@ -9,6 +9,15 @@ def test_valid_token(entra_token):
     assert user.email == "ana@empresa.test" and user.roles == ("Sofibot.Autor", "Ventas") and user.via == "entra"
 
 
+def test_roles_come_from_sofibot_not_from_entra(entra_token):
+    from conftest import grant
+
+    token = entra_token([], entra_roles=["Sofibot.Admin", "Direccion"])     # app roles left in Entra are ignored
+    assert identity.from_bearer(token).roles == ()
+    grant("ana@empresa.test", ["Sofibot.Consultas"])                   # applies to the same token at once
+    assert identity.from_bearer(token).roles == ("Sofibot.Consultas",)
+
+
 @pytest.mark.parametrize("claims", [
     {"aud": "api://otra-app"},
     {"tid": "otro-tenant"},

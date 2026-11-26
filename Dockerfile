@@ -38,9 +38,11 @@ RUN pip install --no-cache-dir --no-deps . && pip check && rm -rf src
 COPY docs ./docs
 COPY mcp-server ./mcp-server
 
-# reports/: proyectos de informe (código). output/: informes generados. consultas/: registro del
-# servicio de consultas (docs/11-consultas.md). Se montan como volúmenes.
-RUN mkdir -p /app/reports /app/output /app/consultas && chown sofibot:sofibot /app/reports /app/output /app/consultas
+# reports/: proyectos de informe (código). output/: informes generados. acceso/: usuarios, roles y
+# permisos (docs/09-inicio-sesion-entra.md). consultas/: registro del servicio de consultas
+# (docs/11-consultas.md). Se montan como volúmenes.
+RUN mkdir -p /app/reports /app/output /app/acceso /app/consultas \
+    && chown sofibot:sofibot /app/reports /app/output /app/acceso /app/consultas
 USER sofibot
 EXPOSE 8080
 
