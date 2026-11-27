@@ -82,13 +82,11 @@ async def lifespan(_app):
             access.read()
         except access.PermissionsError as exc:
             log.warning("Permissions: %s. Signed-in users see no reports until it is fixed.", exc)
-        try:
-            accounts = access.read_local_accounts()
-        except access.PermissionsError as exc:
-            accounts = {}
-            log.warning("Local accounts: %s. No local account can sign in until it is fixed.", exc)
+        accounts = access.load_local_accounts()  # logs a broken file or an account in both files
         if accounts:
-            log.info("Local accounts that can sign in without Entra ID: %s", ", ".join(sorted(accounts)))
+            log.info("Local accounts that can sign in without Entra ID (%s): %s",
+                     ", ".join(access.enabled_kinds()),
+                     ", ".join(f"{n}{' (TOTP)' if a['tipo'] == access.TOTP else ''}" for n, a in sorted(accounts.items())))
         elif sign_in == "local":
             log.warning("SOFIBOT_AUTH=local but there is no local account: create one with  sofibot local-account add NAME")
     times = schedule_times()

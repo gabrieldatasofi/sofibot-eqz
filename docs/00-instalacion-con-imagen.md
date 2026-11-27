@@ -243,6 +243,8 @@ Datasofi os entrega el paquete de la versión nueva:
    excepción, al pasar de una versión sin cuentas locales (0.2.1 o anterior) a la 0.2.2: si
    vuestra `acceso/` no tiene `cuentas-locales.json`, copiad el del paquete para tener
    `supersofi`.
+   Las cuentas con TOTP (0.2.3) no vienen en el paquete: se crean en vuestra instalación
+   ([09 · Cuentas locales con TOTP](09-inicio-sesion-entra.md#cuentas-locales-con-totp-contraseña-y-código-del-móvil)).
 2. Descargad y arrancad:
 
    ```bash

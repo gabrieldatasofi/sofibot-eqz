@@ -26,6 +26,8 @@ secretos*.env
 # acordada con EQZ (solo hash y roles). Copias que guarda la administración en cada cambio.
 usuarios.json
 /acceso/permisos.json
+# Cuentas con TOTP: guardan el secreto de cada app de autenticación (basta para generar códigos).
+/acceso/cuentas-totp.json
 .copias/
 
 # Registro del servicio de consultas (docs/11-consultas.md)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sofibot-eqz"
-version = "0.2.2"
+version = "0.2.3"
 description = "Informes HTML y Excel desde las tablas Gold de SQL Server"
 requires-python = ">=3.12"
 # Rangos compatibles. Las versiones exactas que se instalan (también las indirectas)
@@ -20,6 +20,7 @@ dependencies = [
     "itsdangerous>=2.2,<3",    # cookie de sesión firmada
     "requests>=2.32,<3",       # el portal reenvía consultas al servicio de consultas
     "markdown>=3.7,<4",        # documentación técnica en la página de administración
+    "segno>=1.6,<2",           # QR del alta de una cuenta con TOTP (sofibot local-account)
 ]
 
 [project.optional-dependencies]

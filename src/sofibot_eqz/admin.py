@@ -4,6 +4,10 @@
                    functionalities and their MCP servers, permissions, versions
 - /admin/usuarios  edit acceso/usuarios.json (user -> roles): who may do what
 - /admin/permisos  edit acceso/permisos.json (data role -> Gold tables)
+- /admin/cuentas   local accounts; with SOFIBOT_LOCAL_ACCOUNTS_WEB=1, create TOTP accounts with a
+                   temporary password (their owner sets a password and scans the QR code at the
+                   first sign-in), reset or delete them. Password-only accounts: only on the
+                   server, with  sofibot local-account
 - /admin/docs      the technical documentation shipped with this version (docs/*.md)
 
 Entra ID only signs users in; roles are given here (access.py). Shows configuration and
@@ -191,22 +195,38 @@ asignan en <a href="/admin/usuarios">Usuarios</a>.</p>
 <h3>Roles de las funcionalidades</h3><table><tr><th>Rol</th><th>Para</th></tr>{roles}</table>"""
 
 
+FULL_TAG = ' <span class="tag total">acceso total</span>'
+OFF_TAG = ' <span class="tag">desactivada</span>'
+
+
 def local_section() -> str:
     """Local accounts: who can sign in without Entra ID. Never shows a hash or a secret."""
     try:
-        accounts, problem = access.read_local_accounts(), ""
+        enabled, problem = access.enabled_kinds(), ""
     except access.PermissionsError as exc:
-        accounts, problem = {}, str(exc)
-    names = ", ".join(sorted(accounts)) or "ninguna"
-    rows = [("Cuentas locales", state(None if accounts else True, names) if not problem else state(False, problem)),
-            ("Tokens para sus conectores (SOFIBOT_LOCAL_SECRET)",
-             state(True, f"Configurado · duran {identity.token_days()} días") if identity.local_secret()
-             else state(None, "No configurado: las cuentas locales no pueden usar conectores ni Consultas"))]
+        enabled, problem = (), str(exc)
+    rows = []
+    for kind, label in ((access.PASSWORD, "Cuentas locales (usuario y contraseña)"),
+                        (access.TOTP, "Cuentas locales con TOTP (contraseña y código de la app)")):
+        try:
+            names = ", ".join(f"{n} (acceso total)" if identity.full_access(a["roles"]) else n
+                              for n, a in sorted(access.read_accounts(kind).items())) or "ninguna"
+            value = (state(True if names == "ninguna" else None, names) if kind in enabled
+                     else state(None, f"Desactivadas en SOFIBOT_LOCAL_ACCOUNTS ({names})"))
+        except access.PermissionsError as exc:
+            value = state(False, str(exc))
+        rows.append((label, value))
+    if problem:
+        rows.append(("SOFIBOT_LOCAL_ACCOUNTS", state(False, problem)))
+    rows.append(("Tokens para sus conectores (SOFIBOT_LOCAL_SECRET)",
+                 state(True, f"Configurado · duran {identity.token_days()} días") if identity.local_secret()
+                 else state(None, "No configurado: las cuentas locales no pueden usar conectores ni Consultas")))
     return f"""<h3 id="locales">Cuentas locales (sin Entra ID)</h3>
 <table>{"".join(f"<tr><th>{escape(k)}</th><td>{v}</td></tr>" for k, v in rows)}</table>
-<p class="meta">Entran con usuario y contraseña, sin pasar por Microsoft: sirven de acceso de emergencia. Se gestionan
-en el servidor con <code>sofibot local-account</code> (docs/09-inicio-sesion-entra.md). Cada entrada queda en el
-registro del portal; tras 5 contraseñas erróneas en 15 minutos el acceso se bloquea un rato.</p>"""
+<p class="meta">Entran sin pasar por Microsoft: sirven de acceso de emergencia. Las cuentas con TOTP piden además el
+código de una aplicación de autenticación. Se gestionan en el servidor con <code>sofibot local-account</code>
+(docs/09-inicio-sesion-entra.md). Cada entrada queda en el registro del portal; tras 5 intentos erróneos en
+15 minutos el acceso se bloquea un rato.</p>"""
 
 
 def functionality_one() -> str:
@@ -276,12 +296,14 @@ async def status_page(request: Request, comprobar: str = "", mensaje: str = ""):
 <p class="meta">Sofibot {__version__} · Python {platform.python_version()} · inicio de sesión {auth.mode()}.
 <a href="#sql">SQL Server</a> · <a href="#entra">Entra ID</a> · <a href="#informes">Informes</a> ·
 <a href="#consultas">Consultas</a> · <a href="/conectar">MCP</a> · <a href="/admin/usuarios">Usuarios</a> ·
-<a href="/admin/permisos">Permisos</a> ·
+<a href="/admin/permisos">Permisos</a> · <a href="/admin/cuentas">Cuentas locales</a> ·
 <a href="/admin/docs">Documentación</a></p>
 <div class="cards"><article class="card"><h3>Usuarios</h3><p>Quién entra en Sofibot y con qué roles.</p>
 <div class="actions"><a class="button primary" href="/admin/usuarios">Editar usuarios</a></div></article>
 <article class="card"><h3>Permisos por tabla</h3><p>Qué tablas Gold da cada rol de datos.</p>
 <div class="actions"><a class="button" href="/admin/permisos">Editar permisos</a></div></article>
+<article class="card"><h3>Cuentas locales</h3><p>Cuentas sin Entra ID, con contraseña y código TOTP del móvil.</p>
+<div class="actions"><a class="button" href="/admin/cuentas">Ver cuentas</a></div></article>
 <article class="card"><h3>Conectores MCP</h3><p>Configuración para Claude y Codex de las dos funcionalidades.</p>
 <div class="actions"><a class="button" href="/conectar">Ver configuración</a></div></article>
 <article class="card"><h3>Documentación técnica</h3><p>Arquitectura, instalación, seguridad, Entra ID, APIs.</p>
@@ -448,12 +470,15 @@ def users_page(request: Request, mensaje: str = ""):
         rows.append(f"<tr><td>{name}</td>{cells}<td class='meta'>{escape(summary) or '—'}</td></tr>")
     functions = "; ".join(f"<code>{escape(r)}</code>: {escape(d)}" for r, d in FUNCTION_ROLES.items())
     accounts = access.load_local_accounts()
-    local_rows = "".join(f"<tr><td><b>{escape(name)}</b> <span class='tag'>cuenta local</span></td>"
+    local_rows = "".join(f"<tr><td><b>{escape(name)}</b> <span class='tag'>cuenta local{' · TOTP' if a['tipo'] == access.TOTP else ''}</span>"
+                         f"{FULL_TAG if identity.full_access(a['roles']) else ''}</td>"
                          f"<td>{escape(', '.join('todas las tablas' if r == access.ALL else r for r in a['roles']))}</td></tr>"
                          for name, a in sorted(accounts.items()))
-    local_html = (f"""<h2>Cuentas locales</h2><p class="meta">Entran con usuario y contraseña, sin Microsoft. Sus roles van
-con la cuenta y se cambian en el servidor con <code>sofibot local-account</code>, no aquí.</p>
-<table><tr><th>Usuario</th><th>Roles</th></tr>{local_rows}</table>""" if accounts else "")
+    local_html = (f"""<h2>Cuentas locales</h2><p class="meta">Entran con usuario y contraseña (y un código TOTP si lo tienen), sin Microsoft. Sus roles van
+con la cuenta y se gestionan en <a href="/admin/cuentas">Cuentas locales</a> o en el servidor con <code>sofibot local-account</code>.</p>
+<table><tr><th>Usuario</th><th>Roles</th></tr>{local_rows}</table>
+<p class="meta"><span class="tag total">acceso total</span> todos los roles y todas las tablas Gold, sean cuales sean,
+sin depender de Permisos por tabla (docs/09-inicio-sesion-entra.md, cuentas de acceso total).</p>""" if accounts else "")
     body = f"""<h1>Usuarios</h1>{ui.notice(mensaje) if mensaje else ""}{ui.notice(problem) if problem else ""}
 <p>Microsoft Entra ID solo valida el inicio de sesión: dice quién es cada persona. Lo que puede hacer en Sofibot
 se decide aquí. Cada fila es una persona, por su <b>correo de Microsoft</b> (con el que inicia sesión), y sus roles:</p>
@@ -499,6 +524,226 @@ async def save_users(request: Request):
         return RedirectResponse(f"/admin/usuarios?mensaje={quote(f'No se ha guardado: {exc}')}", 303)
     record(who.email, "usuarios", json.dumps(users, ensure_ascii=False))
     return RedirectResponse(f"/admin/usuarios?mensaje={quote('Usuarios guardados.')}", 303)
+
+
+# --- Local accounts with TOTP, from the portal (SOFIBOT_LOCAL_ACCOUNTS_WEB=1) ------------
+# The administrator gives a temporary password; at the first sign-in its owner chooses their own
+# password and scans their QR code (auth.py, /auth/activar): the administrator never sees it.
+
+def accounts_web(env=os.environ) -> bool:
+    """SOFIBOT_LOCAL_ACCOUNTS_WEB=1: administrators may create TOTP accounts from the portal."""
+    return env.get("SOFIBOT_LOCAL_ACCOUNTS_WEB", "").strip().lower() in ("1", "true", "yes", "si", "sí")
+
+
+def all_local_accounts() -> tuple[dict[str, dict], list[str]]:
+    """Every local account of both files, enabled or not, and the problems reading them."""
+    accounts, problems = {}, []
+    for kind in access.KINDS:
+        try:
+            accounts.update(access.read_accounts(kind))
+        except access.PermissionsError as exc:
+            problems.append(str(exc))
+    return accounts, problems
+
+
+def back_to_accounts(message: str) -> RedirectResponse:
+    return RedirectResponse(f"/admin/cuentas?mensaje={quote(message)}", 303)
+
+
+def local_date(value: datetime) -> str:
+    return value.astimezone().strftime("%d/%m/%Y %H:%M")
+
+
+def account_state(account: dict) -> str:
+    if account["tipo"] != access.TOTP:
+        return ""
+    if not access.pending(account):
+        return " <span class='tag'>activada</span>"
+    if access.expired(account):
+        return " <span class='tag'>contraseña temporal caducada: restablécela</span>"
+    return f" <span class='tag'>pendiente de activar hasta {escape(local_date(account['activar_hasta']))}</span>"
+
+
+@router.get("/cuentas", response_class=HTMLResponse)
+def accounts_page(request: Request, mensaje: str = ""):
+    try:
+        who = administrator(request)
+    except HTTPException as exc:
+        return refused(request, exc)
+    web = accounts_web()
+    accounts, problems = all_local_accounts()
+    try:
+        enabled = access.enabled_kinds()
+    except access.PermissionsError as exc:
+        enabled, problems = (), [*problems, str(exc)]
+    token = escape(csrf_token(request))
+    rows = []
+    for name, a in sorted(accounts.items()):
+        roles = ", ".join("todas las tablas" if r == access.ALL else r for r in a["roles"]) or "(ninguno)"
+        tags = (f"<span class='tag'>{'TOTP' if a['tipo'] == access.TOTP else 'solo contraseña'}</span>"
+                f"{FULL_TAG if identity.full_access(a['roles']) else ''}{account_state(a)}"
+                f"{'' if a['tipo'] in enabled else OFF_TAG}")
+        actions = "<span class='meta'>en el servidor</span>"
+        if web and a["tipo"] == access.TOTP:
+            if who.via == "local" and who.email == name:
+                actions = "<span class='meta'>tu cuenta</span>"
+            else:
+                hidden = f'<input type="hidden" name="csrf" value="{token}"><input type="hidden" name="usuario" value="{escape(name)}">'
+                actions = (f'<form method="post" action="/admin/cuentas/restablecer" class="inline">{hidden}'
+                           f'<button title="Nueva contraseña temporal: la persona vuelve a elegir contraseña y a escanear el QR">'
+                           f'Restablecer</button></form> <form method="post" action="/admin/cuentas/borrar" class="inline">{hidden}'
+                           f'<label class="meta"><input type="checkbox" name="confirmo" value="1" required> confirmo</label> '
+                           f'<button>Borrar</button></form>')
+        rows.append(f"<tr><td><b>{escape(name)}</b> {tags}<br><span class='meta'>{escape(a['nombre'])}</span></td>"
+                    f"<td>{escape(roles)}</td><td>{actions}</td></tr>")
+    table = (f"<table><tr><th>Usuario</th><th>Roles</th><th>Acciones</th></tr>{''.join(rows)}</table>"
+             if rows else "<p>No hay cuentas locales.</p>")
+    if web:
+        data_roles = sorted(access.load())
+        checks = "".join(f'<label class="check"><input type="checkbox" name="roles" value="{escape(r)}"> {escape(r)}</label>'
+                         for r in [*FUNCTION_ROLES, *data_roles])
+        create = f"""<h2>Nueva cuenta con TOTP</h2>
+<p>Sofibot genera una <b>contraseña temporal</b>, que verás una sola vez: dásela a la persona por un canal aparte.
+La primera vez que entre, elegirá su propia contraseña y escaneará su código QR con una aplicación de autenticación
+del móvil; desde entonces entrará con su contraseña y el código de 6 dígitos. Si no la activa en
+{access.activation_days()} días, la contraseña temporal caduca y hay que restablecerla.</p>
+<form method="post" action="/admin/cuentas/nueva" class="stack"><input type="hidden" name="csrf" value="{token}">
+<label>Usuario <span class="meta">(minúsculas, números, punto, guion; sin @)</span>
+<input name="usuario" required pattern="[a-z0-9][a-z0-9._-]{{1,63}}" maxlength="64"></label>
+<label>Nombre visible <input name="nombre" maxlength="80"></label>
+<fieldset><legend>Acceso</legend>
+<label><input type="radio" name="acceso" value="total" checked> <b>Acceso total</b>: todos los roles y todas las
+tablas Gold, sean cuales sean</label>
+<label><input type="radio" name="acceso" value="roles"> Solo estos roles:</label><div class="checks">{checks}</div>
+</fieldset>
+<div class="actions"><button class="primary">Crear cuenta</button></div></form>"""
+        if access.TOTP not in enabled:
+            create = ui.notice("Las cuentas con TOTP están desactivadas en SOFIBOT_LOCAL_ACCOUNTS: las que crees no "
+                               "podrán entrar hasta que se activen.") + create
+    else:
+        create = """<p class="meta">Crear cuentas desde el portal está desactivado. Se gestionan en el servidor con
+<code>sofibot local-account</code>; para crear cuentas con TOTP desde aquí, <code>SOFIBOT_LOCAL_ACCOUNTS_WEB=1</code>
+en <code>.env</code> (docs/09-inicio-sesion-entra.md).</p>"""
+    body = f"""<h1>Cuentas locales</h1>{ui.notice(mensaje) if mensaje else ""}{"".join(ui.notice(p) for p in problems)}
+<p>Entran en Sofibot sin Microsoft Entra ID, con sus propios roles. Las cuentas con TOTP piden además el código de
+una aplicación del móvil. Las de solo contraseña se gestionan únicamente en el servidor
+(<code>sofibot local-account</code>). Tipos que pueden entrar ahora (SOFIBOT_LOCAL_ACCOUNTS):
+{escape(", ".join(enabled) or "ninguno")}.</p>
+{table}
+<p class="meta"><span class="tag total">acceso total</span> todos los roles y todas las tablas Gold, sean cuales sean,
+sin depender de Permisos por tabla.</p>
+{create}
+<div class="actions"><a class="button" href="/admin">Volver</a></div>"""
+    return ui.page(request, "Cuentas locales", body, active="admin")
+
+
+def web_administrator(request: Request) -> identity.Identity:
+    who = administrator(request)
+    if not accounts_web():
+        raise HTTPException(404, "Crear cuentas desde el portal está desactivado (SOFIBOT_LOCAL_ACCOUNTS_WEB).")
+    return who
+
+
+def temporary_password_page(request: Request, title: str, name: str, password: str, until: datetime) -> HTMLResponse:
+    """The temporary password, shown once: the response is not kept by the browser."""
+    body = f"""<h1>{escape(title)}: {escape(name)}</h1>
+<p>Contraseña temporal. Se muestra <b>solo ahora</b>: cópiala y dásela a la persona por un canal distinto del
+nombre de usuario (por ejemplo, el usuario por correo y la contraseña por teléfono o en el gestor de contraseñas).</p>
+<p><code class="once">{escape(password)}</code></p>
+<p>Vale hasta el <b>{escape(local_date(until))}</b>. La primera vez que entre con ella, Sofibot le pedirá elegir su
+propia contraseña y escanear su código QR con una aplicación de autenticación del móvil. Ni tú ni nadie más verá
+ese QR.</p>
+<div class="actions"><a class="button primary" href="/admin/cuentas">Hecho</a></div>"""
+    response = ui.page(request, "Cuentas locales", body, active="admin")
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@router.post("/cuentas/nueva")
+async def new_account(request: Request):
+    try:
+        who = web_administrator(request)
+        fields = await posted(request)
+    except HTTPException as exc:
+        return refused(request, exc)
+    field = lambda name: (fields.get(name) or [""])[0].strip()  # noqa: E731
+    name = field("usuario").casefold()
+    if not access.USERNAME.fullmatch(name):
+        return back_to_accounts("No se ha creado: el usuario lleva minúsculas, números, '.', '_' o '-', sin '@'.")
+    accounts, problems = all_local_accounts()
+    if problems:
+        return back_to_accounts("No se ha creado: " + "; ".join(problems))
+    if name in accounts:
+        return back_to_accounts(f"No se ha creado: ya existe la cuenta {name}.")
+    if field("acceso") == "total":
+        roles = [*FUNCTION_ROLES, access.ALL]
+    else:
+        roles = sorted(set(fields.get("roles", [])))
+        if not roles or any(not ROLE_NAME.fullmatch(r) for r in roles):
+            return back_to_accounts("No se ha creado: elige acceso total o al menos un rol válido.")
+    password = secrets.token_urlsafe(18)
+    until = access.activation_deadline()
+    totp_accounts = {n: dict(a) for n, a in access.read_totp_accounts().items()}
+    totp_accounts[name] = {"nombre": field("nombre")[:80] or name, "version": 1, "roles": roles, "totp": None,
+                           "activar_hasta": until,
+                           "hash": await run_in_threadpool(identity.hash_password, password)}
+    try:
+        access.save_totp_accounts(totp_accounts)
+    except (OSError, access.PermissionsError) as exc:
+        return back_to_accounts(f"No se ha creado: {exc}")
+    record(who.email, "cuenta local TOTP nueva", f"{name}: {', '.join(roles)}; pendiente de activar")
+    return temporary_password_page(request, "Cuenta creada", name, password, until)
+
+
+@router.post("/cuentas/restablecer")
+async def reset_account(request: Request):
+    try:
+        who = web_administrator(request)
+        fields = await posted(request)
+    except HTTPException as exc:
+        return refused(request, exc)
+    name = (fields.get("usuario") or [""])[0].strip().casefold()
+    if who.via == "local" and who.email == name:
+        return back_to_accounts("No puedes restablecer la cuenta con la que has entrado.")
+    try:
+        accounts = {n: dict(a) for n, a in access.read_totp_accounts().items()}
+    except access.PermissionsError as exc:
+        return back_to_accounts(f"No se ha restablecido: {exc}")
+    if name not in accounts:
+        return back_to_accounts(f"{name} no es una cuenta con TOTP (las demás, en el servidor).")
+    password, until = secrets.token_urlsafe(18), access.activation_deadline()
+    accounts[name].update(hash=await run_in_threadpool(identity.hash_password, password), totp=None,
+                          activar_hasta=until, version=accounts[name]["version"] + 1)
+    try:
+        access.save_totp_accounts(accounts)
+    except (OSError, access.PermissionsError) as exc:
+        return back_to_accounts(f"No se ha restablecido: {exc}")
+    record(who.email, "cuenta local TOTP restablecida", name)
+    return temporary_password_page(request, "Cuenta restablecida", name, password, until)
+
+
+@router.post("/cuentas/borrar")
+async def delete_account(request: Request):
+    try:
+        who = web_administrator(request)
+        fields = await posted(request)
+    except HTTPException as exc:
+        return refused(request, exc)
+    name = (fields.get("usuario") or [""])[0].strip().casefold()
+    if (fields.get("confirmo") or [""])[0] != "1":
+        return back_to_accounts("No se ha borrado: marca «confirmo».")
+    if who.via == "local" and who.email == name:
+        return back_to_accounts("No puedes borrar la cuenta con la que has entrado.")
+    try:
+        accounts = {n: dict(a) for n, a in access.read_totp_accounts().items()}
+        if name not in accounts:
+            return back_to_accounts(f"{name} no es una cuenta con TOTP (las demás, en el servidor).")
+        del accounts[name]
+        access.save_totp_accounts(accounts)
+    except (OSError, access.PermissionsError) as exc:
+        return back_to_accounts(f"No se ha borrado: {exc}")
+    record(who.email, "cuenta local TOTP borrada", name)
+    return back_to_accounts(f"Cuenta {name} borrada: sus sesiones y tokens ya no valen.")
 
 
 # --- Documentation ------------------------------------------------------------------------

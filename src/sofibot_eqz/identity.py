@@ -1,7 +1,7 @@
 """Who is calling, the same way for both functionalities (docs/11-consultas.md, docs/10-api-informes.md).
 
 People sign in with Microsoft Entra ID or, with a local account (acceso/cuentas-locales.json),
-with a user name and password. The portal keeps the user in its session (auth.py); the APIs
+with a user name and password, plus a TOTP code for the accounts in acceso/cuentas-totp.json. The portal keeps the user in its session (auth.py); the APIs
 receive a token (`Authorization: Bearer <token>`) that a client, such as the Sofibot MCP
 server, sends for the user:
 
@@ -31,6 +31,12 @@ ROLE_QUERY = "Sofibot.Consultas"     # functionality 2: query data
 ROLE_ADMIN = "Sofibot.Admin"         # administration page: status, users, permissions, documentation
 FUNCTION_ROLES = (ROLE_AUTHOR, ROLE_REVIEWER, ROLE_QUERY, ROLE_ADMIN)
 ALL_TABLES = None                    # tables() for a caller restricted to no table set
+
+
+def full_access(roles) -> bool:
+    """Every function role and "*" (every Gold table, whatever the client's tables are): a local
+    account such as supersofi, shown as "acceso total" in the administration page and the CLI."""
+    return "*" in roles and all(role in roles for role in FUNCTION_ROLES)
 
 
 class IdentityError(Exception):
@@ -190,6 +196,49 @@ def local_sign_in(name: str, password: str) -> dict | None:
     return {**account, "usuario": name}
 
 
+# --- TOTP (RFC 6238): the code of an authenticator app, for accounts in cuentas-totp.json -----
+TOTP_DIGITS, TOTP_PERIOD, TOTP_ISSUER = 6, 30, "Sofibot"
+
+
+def new_totp_secret() -> str:
+    """160 random bits in base32 without padding, as authenticator apps expect."""
+    return base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
+
+
+def totp_code(secret: str, step: int) -> str:
+    """The code for one 30-second step (HMAC-SHA1, 6 digits: what every authenticator app uses)."""
+    import hmac
+
+    key = base64.b32decode(secret + "=" * (-len(secret) % 8))
+    digest = hmac.new(key, step.to_bytes(8, "big"), hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    value = int.from_bytes(digest[offset:offset + 4], "big") & 0x7FFFFFFF
+    return str(value % 10 ** TOTP_DIGITS).zfill(TOTP_DIGITS)
+
+
+def totp_step(secret: str, code: str, now: float | None = None) -> int | None:
+    """The step whose code this is (now, or one step either side for clock drift), or None.
+
+    The caller rejects a step it has already accepted, so that a code works only once."""
+    code = "".join((code or "").split())
+    if len(code) != TOTP_DIGITS or not code.isdigit():
+        return None
+    current = int((time.time() if now is None else now) // TOTP_PERIOD)
+    found = None
+    for step in (current - 1, current, current + 1):  # check all three: same time for any code
+        if secrets.compare_digest(totp_code(secret, step), code):
+            found = step
+    return found
+
+
+def totp_uri(name: str, secret: str) -> str:
+    """otpauth:// address for the app's QR code: issuer Sofibot, the account's user name."""
+    from urllib.parse import quote
+
+    return (f"otpauth://totp/{quote(TOTP_ISSUER)}:{quote(name)}?secret={secret}&issuer={quote(TOTP_ISSUER)}"
+            f"&algorithm=SHA1&digits={TOTP_DIGITS}&period={TOTP_PERIOD}")
+
+
 def local_secret(env=os.environ) -> str | None:
     """SOFIBOT_LOCAL_SECRET when usable: 32 characters or more, different from the other tokens."""
     value = env.get("SOFIBOT_LOCAL_SECRET", "").strip()
@@ -234,7 +283,7 @@ def from_local_token(token: str, env=os.environ) -> Identity:
     except jwt.InvalidTokenError as exc:
         raise IdentityError(f"Invalid token: {exc}") from exc
     account = load_local_accounts().get(claims["sub"])
-    if account is None or account["version"] != claims["ver"]:
+    if account is None or account.get("activar_hasta") is not None or account["version"] != claims["ver"]:
         raise IdentityError("Invalid token: the account no longer exists or its password has changed; "
                             "create a new token in Sofibot, page 'Conectar tu IA'")
     return Identity(email=claims["sub"], name=account["nombre"], roles=account["roles"], via="local")

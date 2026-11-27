@@ -62,7 +62,10 @@ code{background:#eef2f8;border-radius:4px;padding:1px 4px;font-size:90%}pre code
 .notice{background:#fff;border-left:4px solid var(--orange);padding:8px 12px}
 .ok{color:#2e7d4f;font-weight:500}.bad{color:#b3261e;font-weight:500}.warn{color:var(--orange);font-weight:500}
 .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:10px;background:#eef2f8;margin-left:6px}
-.tag.mine{background:var(--teal);color:#fff}
+.tag.mine{background:var(--teal);color:#fff}.tag.total{background:#D16B1B;color:#fff}
+form.inline{display:inline;margin:0}.stack label{display:block;margin:8px 0}.stack input:not([type=radio]):not([type=checkbox]){display:block;max-width:360px;width:100%;margin-top:4px}
+.checks{display:flex;flex-wrap:wrap;gap:4px 16px;margin:4px 0 4px 24px}.checks .check{margin:0}
+.qr{display:inline-block;background:#fff;padding:12px;border:1px solid var(--line);border-radius:8px}code.once{font-size:17px;padding:4px 8px}
 form.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}
 fieldset{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0}legend{font-size:13px;color:var(--soft)}
 label{display:block;font-size:14px}select,input[type=text],input[type=month],input[type=number]{font:inherit;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff}

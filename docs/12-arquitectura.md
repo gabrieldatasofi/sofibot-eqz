@@ -58,9 +58,14 @@ por tabla** (`acceso/permisos.json`).
   (`identity.py`): de este inquilino, para esta aplicación, de una persona y sin caducar.
 - **Cuentas locales** (`acceso/cuentas-locales.json`, `sofibot local-account`): usuario y
   contraseña (hash scrypt), con sus propios roles; el administrador de emergencia o, con
-  `SOFIBOT_AUTH=local`, una instalación sin Entra ID. Para sus conectores y para Consultas,
-  Sofibot emite tokens propios (HS256 con `SOFIBOT_LOCAL_SECRET`, compartido por el portal y
-  el servicio de consultas), válidos mientras la cuenta no cambie de contraseña.
+  `SOFIBOT_AUTH=local`, una instalación sin Entra ID. Las cuentas con TOTP
+  (`acceso/cuentas-totp.json`, fuera de git: guarda el secreto) piden además un código RFC 6238
+  en un segundo paso (`/auth/codigo`); `SOFIBOT_LOCAL_ACCOUNTS` elige qué tipos entran. Con
+  `SOFIBOT_LOCAL_ACCOUNTS_WEB=1` se crean también desde Administración → Cuentas locales, con
+  una contraseña temporal (`activar_hasta`); al entrar la primera vez, su dueño elige contraseña
+  y escanea el QR en `/auth/activar` (secreto en memoria hasta un código correcto). Para sus conectores y para
+  Consultas, Sofibot emite tokens propios (HS256 con `SOFIBOT_LOCAL_SECRET`, compartido por el
+  portal y el servicio de consultas), válidos mientras la cuenta no cambie de contraseña.
 - **Entra ID solo valida el inicio de sesión** (quién es). Los roles los da Sofibot, por
   correo, en `acceso/usuarios.json` (editable en Administración → Usuarios; el primer
   administrador, con `sofibot users add`). Los roles que lleve el token de Entra se ignoran.

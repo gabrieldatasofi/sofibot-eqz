@@ -12,9 +12,9 @@ database). Do not look for workarounds.
 - Never read `.env`, `output/`, `*.xlsx`, `*.csv` or any built report.
 - Never run `sofibot build`, `sofibot check`, `generate.py`, `sqlcmd` or ad-hoc SQL
   against a client database. Never ask for or use client credentials.
-- Never run `sofibot local-account` (it shows or asks for passwords: a person runs it),
-  never read `acceso/cuentas-locales.json`, and never ask for or use a local account's
-  password or personal token.
+- Never run `sofibot local-account` (it shows or asks for passwords and TOTP secrets: a
+  person runs it), never read `acceso/cuentas-locales.json` or `acceso/cuentas-totp.json`,
+  and never ask for or use a local account's password, TOTP code or personal token.
 - The only exception is the public Contoso example on a Datasofi development machine,
   through its own environment: `docker compose -f examples/contoso/compose.yaml ...`, whose
   configuration (`examples/contoso/.env`, never read either) only ever points at the

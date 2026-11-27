@@ -61,13 +61,27 @@ Las cuentas locales ([09 · Cuentas locales](09-inicio-sesion-entra.md#cuentas-l
 entran con usuario y contraseña, **sin la MFA ni el acceso condicional de Entra ID**. Son el
 acceso de emergencia que no depende de Microsoft, y por eso mismo hay que cuidarlas:
 
-- pocas: normalmente una, `sofibot.admin`, y solo con los roles que necesite;
+- pocas: normalmente una, `sofibot.admin`, y solo con los roles que necesite. Las de **acceso
+  total** (todos los roles y `*`, como `supersofi` o una cuenta creada sin `--roles`) ven todas
+  las tablas Gold del cliente sin depender de Permisos por tabla; en Administración llevan la
+  etiqueta *acceso total* ([09 · Cuentas de acceso total](09-inicio-sesion-entra.md#cuentas-de-acceso-total));
+- mejor con TOTP (`sofibot local-account add sofibot.admin --totp --generate`): además de la
+  contraseña piden el código de una aplicación de autenticación del móvil, así que una
+  contraseña filtrada no basta. Con `SOFIBOT_LOCAL_ACCOUNTS=totp` solo entran estas. Su secreto
+  está en `acceso/cuentas-totp.json`, que nunca va en git ni en el paquete y se protege como
+  `.env`. Con `SOFIBOT_LOCAL_ACCOUNTS_WEB=1`, cualquier administrador de Sofibot puede crear
+  estas cuentas desde el portal: activadlo solo si confiáis en todos los administradores
+  (queda en *Cambios de administración*). El administrador solo ve una contraseña temporal,
+  que caduca a los 7 días; el QR lo ve únicamente la persona al activar su cuenta. Quien
+  intercepte la contraseña temporal antes podría activarla: dadla por un canal distinto del
+  usuario y comprobad en la lista que la cuenta queda *activada*;
 - contraseña aleatoria (`--generate`), guardada en el gestor de contraseñas de la empresa y
   conocida por pocas personas; cambiarla (`sofibot local-account passwd`) cuando alguien que
   la conocía deja de necesitarla. La cuenta de pruebas `supersofi` viene creada en el
   repositorio y en el paquete de instalación (acordado con EQZ): antes de trabajar con datos
   en producción de forma estable, cambiad su contraseña en el servidor o borradla;
-- Sofibot solo guarda su *hash* (scrypt), bloquea temporalmente tras 5 fallos en 15 minutos y
+- Sofibot solo guarda el *hash* de la contraseña (scrypt), cada código TOTP sirve una sola vez,
+  bloquea temporalmente tras 5 fallos (contraseñas o códigos) en 15 minutos y
   registra en el log cada entrada, cada fallo y cada token emitido;
 - sus tokens personales (para Claude o Codex) caducan (`SOFIBOT_LOCAL_TOKEN_DAYS`) y se anulan
   al cambiar la contraseña o con `sofibot local-account revoke`;

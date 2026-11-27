@@ -43,6 +43,9 @@ a quien os ayude, también a un asistente de IA.
 | `SOFIBOT_DRAFTS_DIR` | `reports/.borradores` | Carpeta de los borradores escritos por la API |
 | `SOFIBOT_AUTH` | ver descripción | Inicio de sesión en el portal: `entra`, `local` (solo cuentas locales, sin Entra ID), `basic` o `none` ([05 · Operación](05-operacion.md)). Sin valor: `basic` si hay `SOFIBOT_VIEWER_PASSWORD`, `none` si no |
 | `SOFIBOT_LOCAL_SECRET` | — | Firma de los tokens de las cuentas locales (conectores y Consultas). Mínimo 32 caracteres, distinto de los otros tokens; el mismo valor en `.env.consultas` ([09 · Cuentas locales](09-inicio-sesion-entra.md#cuentas-locales-sin-entra-id)) |
+| `SOFIBOT_LOCAL_ACCOUNTS` | `password,totp` | Qué cuentas locales pueden entrar: `password` (usuario y contraseña, `acceso/cuentas-locales.json`), `totp` (además, código de una app de autenticación, `acceso/cuentas-totp.json`) o las dos. `totp` recomendado en producción ([09 · Cuentas locales con TOTP](09-inicio-sesion-entra.md#cuentas-locales-con-totp-contraseña-y-código-del-móvil)) |
+| `SOFIBOT_LOCAL_ACCOUNTS_WEB` | `0` | `1` permite a los administradores crear cuentas con TOTP con una contraseña temporal (la persona elige su contraseña y escanea su QR al entrar la primera vez), restablecerlas o borrarlas en Administración → Cuentas locales ([09](09-inicio-sesion-entra.md#crear-cuentas-con-totp-desde-el-portal)). Las de solo contraseña, siempre en el servidor |
+| `SOFIBOT_LOCAL_ACTIVATION_DAYS` | `7` | Días que vale la contraseña temporal de una cuenta creada desde el portal (1 a 30) |
 | `SOFIBOT_LOCAL_TOKEN_DAYS` | `30` | Días que dura el token personal de una cuenta local (1 a 365) |
 | `SOFIBOT_VIEWER_USER` | `equivalenza` | Usuario compartido (`basic`) |
 | `SOFIBOT_VIEWER_PASSWORD` | — | Contraseña compartida (`basic`) |

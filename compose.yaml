@@ -4,7 +4,7 @@
 services:
   sofibot:
     build: .
-    image: datasofi/sofibot-eqz:0.2.2
+    image: datasofi/sofibot-eqz:0.2.3
     env_file:
       - path: .env
       # Producción en Linux: contraseñas y tokens fuera de esta carpeta, solo legibles por root
@@ -29,7 +29,7 @@ services:
   # Se activa con COMPOSE_PROFILES=consultas en .env (con HTTPS: COMPOSE_PROFILES=https,consultas).
   consultas:
     build: .
-    image: datasofi/sofibot-eqz:0.2.2
+    image: datasofi/sofibot-eqz:0.2.3
     profiles: ["consultas"]
     command: ["sofibot", "serve-consultas", "--host", "0.0.0.0", "--port", "8080"]
     env_file:

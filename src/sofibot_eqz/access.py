@@ -10,6 +10,9 @@ decides what they may do, with the files in the acceso/ folder:
   Entra ID (the emergency administrator, or every user where there is no Entra ID). Only
   the password's hash is kept; each account carries its own roles, where "*" means every
   Gold table (identity.py checks the passwords and Sofibot's own tokens).
+- cuentas-totp.json: the same, plus a code from an authenticator app (TOTP). It keeps each
+  account's TOTP secret, so it never goes in git or in an installation package.
+SOFIBOT_LOCAL_ACCOUNTS chooses which of the two kinds may sign in.
 
 A report is visible when the user's roles, together, cover every table the report reads (its
 report.json "tables"): a report is built in advance for everyone, so it cannot show only part
@@ -17,7 +20,7 @@ of itself. Both files are read on every request, so a change applies without res
 without signing in again. Installations from before acceso/ keep reports/permisos.json until
 the permissions are first saved from the administration page.
 """
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 import logging
 import os
@@ -124,14 +127,67 @@ def save_users(users: dict[str, list[str]]) -> None:
 
 
 # --- Local accounts: user name -> password hash and roles -------------------------------
+# Two kinds, in two files: cuentas-locales.json (user name and password) and cuentas-totp.json
+# (user name, password and a TOTP code from an authenticator app). The second keeps each
+# account's TOTP secret, which, unlike a hash, is enough to make codes: it never goes in git.
+PASSWORD, TOTP = "password", "totp"
+KINDS = (PASSWORD, TOTP)
+BASE32 = re.compile(r"[A-Z2-7]{16,128}")
+
 
 def local_accounts_file():
     return config.ACCESS_DIR / "cuentas-locales.json"
 
 
-def read_local_accounts() -> dict[str, dict]:
-    """Name -> {"nombre", "hash", "version", "roles"}. Missing file: no accounts. Malformed: PermissionsError."""
-    path = local_accounts_file()
+def totp_accounts_file():
+    return config.ACCESS_DIR / "cuentas-totp.json"
+
+
+def accounts_file(kind: str):
+    return totp_accounts_file() if kind == TOTP else local_accounts_file()
+
+
+def enabled_kinds(env=os.environ) -> tuple[str, ...]:
+    """SOFIBOT_LOCAL_ACCOUNTS: which kinds of local account may sign in ("password,totp" by default)."""
+    value = env.get("SOFIBOT_LOCAL_ACCOUNTS", "").replace(" ", "").lower()
+    if not value:
+        return KINDS
+    kinds = tuple(dict.fromkeys(value.split(",")))
+    if bad := [k for k in kinds if k not in KINDS]:
+        raise PermissionsError(f"SOFIBOT_LOCAL_ACCOUNTS: unknown {', '.join(bad)} (use password, totp or both)")
+    return kinds
+
+
+def activation_days(env=os.environ) -> int:
+    """SOFIBOT_LOCAL_ACTIVATION_DAYS: days a new TOTP account's temporary password lasts (1 to 30)."""
+    try:
+        days = int(env.get("SOFIBOT_LOCAL_ACTIVATION_DAYS", "") or 7)
+    except ValueError:
+        days = 7
+    return max(1, min(30, days))
+
+
+def activation_deadline(env=os.environ) -> datetime:
+    return (datetime.now(timezone.utc) + timedelta(days=activation_days(env))).replace(microsecond=0)
+
+
+def pending(account: dict) -> bool:
+    """A TOTP account created with a temporary password that its owner has not activated yet."""
+    return account.get("activar_hasta") is not None
+
+
+def expired(account: dict) -> bool:
+    return pending(account) and account["activar_hasta"] <= datetime.now(timezone.utc)
+
+
+def read_accounts(kind: str) -> dict[str, dict]:
+    """Name -> {"nombre", "hash", "version", "roles", "tipo", "totp", "activar_hasta"} of one kind.
+
+    "totp" is the account's TOTP secret, None for a password-only account and for a TOTP account
+    still to be activated: then "activar_hasta" says until when its temporary password works (its
+    owner chooses a password and scans the QR code at the first sign-in). Missing file: no
+    accounts. Malformed: PermissionsError."""
+    path = accounts_file(kind)
     if not path.is_file():
         return {}
     data = _json(path)
@@ -142,29 +198,81 @@ def read_local_accounts() -> dict[str, dict]:
     for name, account in accounts.items():
         if not USERNAME.fullmatch(name):
             raise PermissionsError(f'{path}: "{name}" is not a valid user name (lower case, no "@")')
-        roles = account.get("roles") if isinstance(account, dict) else None
+        account = account if isinstance(account, dict) else {}
+        roles = account.get("roles")
         if (not isinstance(account.get("hash"), str) or not isinstance(account.get("version"), int)
                 or not isinstance(roles, list)
                 or not all(isinstance(r, str) and (r == ALL or ROLE_NAME.fullmatch(r)) for r in roles)):
             raise PermissionsError(f'{path}: "{name}" needs "hash", a whole "version" and a list of "roles"')
+        secret, until = account.get("totp"), None
+        if kind == TOTP and secret is None and "activar_hasta" in account:
+            try:
+                until = datetime.fromisoformat(str(account["activar_hasta"]))
+            except ValueError:
+                until = None
+            if until is None or until.tzinfo is None:
+                raise PermissionsError(f'{path}: "{name}": "activar_hasta" must be a date with its time zone')
+        elif kind == TOTP and not (isinstance(secret, str) and BASE32.fullmatch(secret)):
+            raise PermissionsError(f'{path}: "{name}" needs its "totp" secret (create it with  sofibot local-account totp)')
         result[name] = {"nombre": str(account.get("nombre") or name), "hash": account["hash"],
-                        "version": account["version"], "roles": tuple(sorted(set(roles)))}
+                        "version": account["version"], "roles": tuple(sorted(set(roles))), "tipo": kind,
+                        "totp": secret if kind == TOTP else None, "activar_hasta": until}
     return result
 
 
-def load_local_accounts() -> dict[str, dict]:
-    """Like read_local_accounts(), but a broken file lets no local account in instead of failing."""
+def read_local_accounts() -> dict[str, dict]:
+    """The password-only accounts (cuentas-locales.json)."""
+    return read_accounts(PASSWORD)
+
+
+def read_totp_accounts() -> dict[str, dict]:
+    """The accounts with a TOTP code (cuentas-totp.json)."""
+    return read_accounts(TOTP)
+
+
+def load_local_accounts(env=os.environ) -> dict[str, dict]:
+    """Every local account that may sign in now: of the kinds SOFIBOT_LOCAL_ACCOUNTS enables.
+
+    A broken file lets none of its accounts in instead of failing; a name in both files signs
+    in with neither (it is ambiguous which one is meant)."""
     try:
-        return read_local_accounts()
+        kinds = enabled_kinds(env)
     except PermissionsError as exc:
         log.warning("Local accounts: %s. No local account can sign in until it is fixed.", exc)
         return {}
+    found: list[dict[str, dict]] = []
+    for kind in kinds:
+        try:
+            found.append(read_accounts(kind))
+        except PermissionsError as exc:
+            log.warning("Local accounts: %s. None of its accounts can sign in until it is fixed.", exc)
+    result: dict[str, dict] = {}
+    for accounts in found:
+        result.update(accounts)
+    if len(found) == 2 and (both := set(found[0]) & set(found[1])):
+        log.warning("Local accounts in both files cannot sign in: %s", ", ".join(sorted(both)))
+        for name in both:
+            del result[name]
+    return result
+
+
+def save_accounts(kind: str, accounts: dict[str, dict]) -> None:
+    data = {}
+    for name, a in sorted(accounts.items()):
+        data[name] = {"nombre": a["nombre"], "hash": a["hash"], "version": a["version"], "roles": sorted(set(a["roles"]))}
+        if kind == TOTP:
+            data[name]["totp"] = a.get("totp")
+            if a.get("totp") is None:
+                data[name]["activar_hasta"] = a["activar_hasta"].isoformat()
+    save(accounts_file(kind), {"cuentas": data}, lambda: read_accounts(kind))
 
 
 def save_local_accounts(accounts: dict[str, dict]) -> None:
-    data = {name: {"nombre": a["nombre"], "hash": a["hash"], "version": a["version"], "roles": sorted(set(a["roles"]))}
-            for name, a in sorted(accounts.items())}
-    save(local_accounts_file(), {"cuentas": data}, read_local_accounts)
+    save_accounts(PASSWORD, accounts)
+
+
+def save_totp_accounts(accounts: dict[str, dict]) -> None:
+    save_accounts(TOTP, accounts)
 
 
 # --- Permissions: data role -> Gold tables ------------------------------------------------

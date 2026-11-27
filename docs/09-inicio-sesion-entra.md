@@ -311,9 +311,10 @@ para dos cosas:
 
 Cada cuenta lleva sus propios roles (los mismos roles de funcionalidad y de datos; además, `*`
 da todas las tablas Gold). Están en `acceso/cuentas-locales.json`, que solo guarda un *hash*
-de la contraseña (scrypt), nunca la contraseña. No se gestionan en Administración → Usuarios
-(que solo las muestra) sino en el servidor, con el comando `sofibot local-account`, que debe
-ejecutar una persona (nunca un asistente de IA: muestra o pide contraseñas).
+de la contraseña (scrypt), nunca la contraseña. Se ven en Administración → **Cuentas locales**.
+Se gestionan en el servidor con el comando `sofibot local-account`, que debe ejecutar una persona
+(nunca un asistente de IA: muestra o pide contraseñas). Las cuentas con TOTP también se pueden
+crear desde el portal, si se activa ([más abajo](#crear-cuentas-con-totp-desde-el-portal)).
 
 ### Crear el administrador de emergencia
 
@@ -346,6 +347,155 @@ pruebas, o si la contraseña ha circulado más de la cuenta, cambiadla en el ser
 Los cambios se aplican al momento, sin reiniciar. Cambiar la contraseña (o `revoke`) cierra
 las sesiones abiertas de la cuenta y anula todos sus tokens.
 
+### Cuentas de acceso total
+
+Una cuenta local de **acceso total** tiene los cuatro roles de funcionalidad
+(`Sofibot.Autor`, `Sofibot.Revisor`, `Sofibot.Consultas` y `Sofibot.Admin`) y además el rol
+`*`. Pueden serlo tanto las cuentas de solo contraseña como las de TOTP. Son de acceso total:
+
+- `supersofi`, la cuenta de pruebas;
+- cualquier cuenta creada con `sofibot local-account add` sin `--roles`, como `sofibot.admin`.
+
+**No dependen de las tablas de cada cliente.** El rol `*` no es una lista de tablas: significa
+"todas las tablas Gold, sean cuales sean". Sofibot no lo traduce a tablas concretas ni lo cruza
+con Administración → Permisos por tabla (`acceso/permisos.json`). Por eso, cuando se instala
+Sofibot sobre la base de datos de un cliente, una cuenta de acceso total ve todos sus informes y
+todas sus tablas desde el primer momento, aunque nadie haya definido todavía qué roles ven qué
+tablas. Es la forma de entrar para configurar el resto.
+
+**Dónde se ven:**
+
+| Dónde | Cómo |
+|---|---|
+| Administración → Usuarios, tabla *Cuentas locales* | Etiqueta naranja **acceso total** |
+| Administración → Estado, *Cuentas locales* | `nombre (acceso total)` |
+| `sofibot local-account` (lista, sin secretos) | `[FULL ACCESS: every role and every Gold table, whatever the tables]` |
+
+**Lo que el acceso total no salta.** Da todos los permisos *de Sofibot*, pero solo sobre lo que
+Sofibot puede leer:
+
+- solo el esquema Gold configurado (`SQLSERVER_GOLD_SCHEMA`), nunca otros esquemas;
+- para escribir informes, solo las tablas del contrato `reports/gold_schema.json`;
+- en Consultas, solo las tablas, medidas y dimensiones del catálogo;
+- en SQL Server, solo lo que permita el login de solo lectura de `.env`.
+
+Si una cuenta de acceso total no ve una tabla del cliente, no es un problema de permisos de
+Sofibot. Revisad el esquema, el contrato, el catálogo o los permisos del login SQL.
+
+**Usuarios de Entra ID.** El rol `*` solo existe en las cuentas locales. Para que un usuario de
+Microsoft vea todas las tablas, se le da un rol de datos con `"*"` en Permisos por tabla (por
+ejemplo `"Direccion": ["*"]`), que tampoco depende de las tablas de cada cliente, más los roles
+de funcionalidad que necesite.
+
+**Quitar el acceso total** a una cuenta: darle solo los roles que necesite, por ejemplo
+`sofibot local-account roles sofibot.admin Sofibot.Admin Ventas`. Con pocas cuentas de acceso
+total, y mejor con TOTP, el riesgo es menor ([06 · Seguridad](06-seguridad.md#cuentas-locales)).
+
+### Cuentas locales con TOTP (contraseña y código del móvil)
+
+Una **cuenta con TOTP** es otro tipo de cuenta local: después del usuario y la contraseña,
+el portal pide el código de 6 dígitos que muestra una aplicación de autenticación en el móvil
+(Microsoft Authenticator, Google Authenticator, 1Password...). Así, quien averigüe la contraseña
+tampoco puede entrar sin ese móvil. Es la opción recomendada para el administrador de emergencia.
+
+```bash
+docker compose run --rm sofibot sofibot local-account add sofibot.admin --totp --generate
+```
+
+1. Muestra la contraseña (con `--generate`) y, después, un **código QR** en la terminal: la
+   persona que usará la cuenta lo escanea con su aplicación. Debajo aparece también la clave en
+   texto, por si se prefiere escribirla a mano.
+2. Pide el código que muestra la aplicación y solo guarda la cuenta si es correcto, así no hay
+   cuentas con el móvil mal configurado.
+
+El QR y la clave se muestran **una sola vez**. Lo ejecuta una persona, nunca un asistente de IA.
+Si la terminal no muestra bien el QR, se escribe la clave a mano en la app, o se crea la cuenta
+desde el portal ([más abajo](#crear-cuentas-con-totp-desde-el-portal)).
+
+Estas cuentas se guardan en `acceso/cuentas-totp.json`, aparte de `cuentas-locales.json`. Ese
+fichero guarda el *hash* de la contraseña y también el **secreto TOTP** de cada cuenta. A
+diferencia de un *hash*, el secreto basta para generar códigos. Por eso **no va en git ni en el
+paquete de instalación**: cada instalación crea sus cuentas TOTP en su servidor. Hay que
+protegerlo como `.env`.
+
+| Tarea | Comando (en la carpeta de Sofibot) |
+|---|---|
+| Móvil perdido o cambiado: secreto nuevo (cierra sus sesiones y anula sus tokens) | `... sofibot local-account totp sofibot.admin` |
+| Contraseña, roles, `revoke`, borrarla | Los mismos comandos que una cuenta local sin TOTP |
+
+Un mismo nombre no puede estar en los dos ficheros. Si lo está, no entra con ninguno de los dos.
+
+#### Crear cuentas con TOTP desde el portal
+
+Un administrador crea la cuenta con una **contraseña temporal**. La primera vez que la persona
+entra, Sofibot le pide elegir su propia contraseña y escanear **su** código QR. Así el segundo
+factor solo lo tiene quien usa la cuenta: ni el administrador ni nadie más ve el QR.
+
+Está **desactivado por defecto**, porque permite a cualquier administrador de Sofibot (también
+uno de Entra ID) crear cuentas que entran sin Microsoft. Para activarlo, en `.env`:
+
+```bash
+SOFIBOT_LOCAL_ACCOUNTS_WEB=1
+#SOFIBOT_LOCAL_ACTIVATION_DAYS=7    # días que vale la contraseña temporal (1 a 30)
+```
+
+y `docker compose up -d`.
+
+**El administrador**, en **Administración → Cuentas locales → Nueva cuenta con TOTP**:
+
+1. Pone el usuario, el nombre visible y el acceso: **acceso total** (todos los roles y todas
+   las tablas) o solo los roles que marque.
+2. Sofibot muestra **una sola vez** la contraseña temporal y hasta cuándo vale (7 días por
+   defecto). El administrador se la da a la persona por un canal distinto del usuario, por
+   ejemplo el usuario por correo y la contraseña por teléfono.
+
+**La persona**, la primera vez que entra con su usuario y la contraseña temporal, ve la página
+*Activa tu cuenta*:
+
+1. elige su contraseña (12 caracteres o más, distinta de la temporal). Con **Generar
+   contraseña**, el navegador crea una aleatoria de 20 caracteres, la rellena y permite copiarla
+   al gestor de contraseñas (se genera en el navegador: Sofibot no la ve ni la guarda);
+2. escanea el código QR con una aplicación de autenticación (Microsoft Authenticator:
+   *Agregar cuenta → Otra cuenta*) o escribe a mano la clave que aparece debajo. La clave lleva
+   letras y números: los 6 dígitos son el código que genera la app;
+3. escribe el código de 6 dígitos. Si es correcto, la cuenta queda activada y entra.
+
+Hasta que la activa, la cuenta no puede ver nada ni generar tokens. Si pasan los días sin
+activarla, la contraseña temporal caduca y la página de entrada lo dice.
+
+En la lista de cuentas se ve el estado de cada una: *pendiente de activar hasta...*,
+*contraseña temporal caducada* o *activada*. Cada cuenta con TOTP tiene:
+- **Restablecer**: una nueva contraseña temporal, para un móvil perdido o cambiado, una
+  contraseña olvidada o una activación caducada. Cierra sus sesiones y anula sus tokens, y la
+  persona vuelve a activar la cuenta;
+- **Borrar**.
+
+Nadie puede restablecer ni borrar la cuenta con la que ha entrado. Las cuentas de solo
+contraseña siguen gestionándose únicamente en el servidor. Cada alta, restablecimiento y borrado
+queda en *Cambios de administración*, con quién lo hizo, y cada activación en el log
+(`Local account activated`).
+
+En el servidor, `sofibot local-account totp NOMBRE` también activa una cuenta pendiente, con el
+QR en la terminal: es para quien está delante del servidor con su móvil.
+
+**Qué tipos de cuenta local se aceptan.** `SOFIBOT_LOCAL_ACCOUNTS` (en `.env`) decide qué
+cuentas locales pueden entrar:
+
+| Valor | Entran |
+|---|---|
+| `password,totp` (por defecto) | Las dos: las de solo contraseña y las de TOTP |
+| `totp` | Solo las cuentas con TOTP. Recomendado en producción |
+| `password` | Solo las de usuario y contraseña |
+
+Al quitar un tipo, sus cuentas dejan de poder entrar al momento, también las sesiones ya
+abiertas y sus tokens. Las cuentas siguen en su fichero, y Administración las muestra como
+desactivadas. Por ejemplo, con `SOFIBOT_LOCAL_ACCOUNTS=totp` la cuenta de pruebas `supersofi`,
+que es de solo contraseña, ya no entra.
+
+Si el código no se acepta, casi siempre es que la hora del móvil o del servidor no está bien:
+la del móvil debe ser automática. Se acepta el código actual, el anterior y el siguiente, y cada
+código sirve una sola vez.
+
 ### Conectores de Claude y Codex y Consultas con una cuenta local
 
 Los conectores y el servicio de consultas no pueden pedir un token a Microsoft para una cuenta
@@ -370,14 +520,17 @@ un token de 15 minutos en cada consulta), siempre que los dos servicios tengan e
 
 ### Protección
 
-- Tras 5 contraseñas erróneas en 15 minutos, para un mismo usuario o una misma dirección,
-  el formulario rechaza los intentos durante un rato (también con la contraseña correcta).
+- Tras 5 intentos erróneos en 15 minutos (contraseñas o códigos TOTP), para un mismo usuario o
+  una misma dirección, el formulario rechaza los intentos durante un rato (también con la
+  contraseña o el código correctos). Tras la contraseña correcta, hay 5 minutos para escribir
+  el código.
 - Cada entrada, cada fallo y cada bloqueo quedan en el log (`docker compose logs sofibot`,
   `Signed in with a local account` / `Local sign-in failed`), y cada token personal emitido
   (`Personal token issued`).
 - Administración muestra qué cuentas locales existen y si los tokens están configurados.
 - Una cuenta local no pasa por la MFA ni el acceso condicional de Entra ID: usad una contraseña
-  larga y aleatoria, guardada en el gestor de contraseñas, y pocas cuentas. Ver
+  larga y aleatoria, guardada en el gestor de contraseñas, y pocas cuentas. Mejor aún, una
+  cuenta con TOTP y `SOFIBOT_LOCAL_ACCOUNTS=totp`. Ver
   [06 · Seguridad](06-seguridad.md#cuentas-locales).
 
 ## Operación
@@ -390,7 +543,7 @@ un token de 15 minutos en cada consulta), siempre que los dos servicios tengan e
 | Informe nuevo | Nada, si sus tablas ya están en algún rol. Comprobar con `sofibot permissions` quién lo ve |
 | Tabla Gold nueva | Añadirla a los roles que deben verla en Permisos por tabla |
 | Primer administrador, o recuperar el acceso si nadie es administrador | `docker compose run --rm sofibot sofibot users add <correo> Sofibot.Admin` |
-| Administrador de emergencia, sin Entra ID | `docker compose run --rm sofibot sofibot local-account add sofibot.admin --generate` ([Cuentas locales](#cuentas-locales-sin-entra-id)) |
+| Administrador de emergencia, sin Entra ID | `docker compose run --rm sofibot sofibot local-account add sofibot.admin --totp --generate` ([Cuentas locales con TOTP](#cuentas-locales-con-totp-contraseña-y-código-del-móvil)) |
 | Renovar el secreto (antes de que caduque) | Entra ID → Certificados y secretos → nuevo secreto; cambiar `ENTRA_CLIENT_SECRET` en `.env`; `docker compose up -d`; borrar el secreto antiguo en Entra ID |
 | Ver quién entra | `docker compose logs sofibot \| grep "Signed in"`: cada inicio de sesión queda registrado con el correo y los roles |
 

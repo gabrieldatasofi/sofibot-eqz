@@ -11,6 +11,8 @@
     sofibot users remove EMAIL [ROLE]   take roles away, or the user if no role is named
     sofibot local-account               list the local accounts (sign-in without Entra ID)
     sofibot local-account add NAME [--generate] [--roles R ...]   create one (default: every role, every table)
+    sofibot local-account add NAME --totp   one that also asks for a code from an authenticator app (TOTP)
+    sofibot local-account totp NAME     new TOTP secret, scanned here (a lost phone, or a pending account)
     sofibot local-account passwd NAME   change its password (its sessions and tokens stop working)
     sofibot local-account revoke NAME   end its sessions and tokens, keeping the password
     sofibot local-account roles NAME R ...   set its roles ("*" = every Gold table)
@@ -169,31 +171,38 @@ def users(args) -> int:
 
 
 def local_account(args) -> int:
-    """Manage acceso/cuentas-locales.json. Prints names and roles only, never a hash.
+    """Manage acceso/cuentas-locales.json and acceso/cuentas-totp.json. Prints names and roles
+    only, never a hash.
 
-    A password is typed (hidden) or, with --generate, made at random and printed once: run it
-    yourself in a terminal, never through an AI assistant, which would then see the password.
+    A password is typed (hidden) or, with --generate, made at random and printed once; a TOTP
+    secret is shown once as a QR code to scan with an authenticator app. Run it yourself in a
+    terminal, never through an AI assistant, which would then see the password or the secret.
     """
     import getpass
     import secrets
 
-    from .access import ALL, ROLE_NAME, USERNAME, PermissionsError, local_accounts_file, read_local_accounts, \
-        save_local_accounts
-    from .identity import FUNCTION_ROLES, MIN_PASSWORD, hash_password
+    from .access import ALL, PASSWORD, ROLE_NAME, TOTP, USERNAME, PermissionsError, accounts_file, enabled_kinds, \
+        read_accounts, save_accounts
+    from .identity import FUNCTION_ROLES, MIN_PASSWORD, full_access, hash_password, new_totp_secret
 
     try:
-        accounts = {name: dict(account) for name, account in read_local_accounts().items()}
+        files = {kind: {name: dict(a) for name, a in read_accounts(kind).items()} for kind in (PASSWORD, TOTP)}
     except PermissionsError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     name = args.name.strip().casefold()
+    kind = next((k for k in (PASSWORD, TOTP) if name in files[k]), None)
     if args.action != "list":
         if not USERNAME.fullmatch(name):
             print("ERROR: give a user name: lower case letters, digits, '.', '_' or '-', no '@' (e.g. sofibot.admin)",
                   file=sys.stderr)
             return 2
-        if args.action != "add" and name not in accounts:
+        if args.action != "add" and kind is None:
             print(f"ERROR: {name} is not a local account", file=sys.stderr)
+            return 1
+        if args.action == "totp" and kind != TOTP:
+            print(f"ERROR: {name} has no TOTP: create a TOTP account with  sofibot local-account add NAME --totp",
+                  file=sys.stderr)
             return 1
     roles = list(args.add_roles or args.roles or [])
     if bad := [r for r in roles if r != ALL and not ROLE_NAME.fullmatch(r)]:
@@ -215,36 +224,96 @@ def local_account(args) -> int:
         return password
 
     if args.action == "add":
-        if name in accounts:
+        if kind is not None:
             print(f"ERROR: {name} already exists: use  sofibot local-account passwd {name}", file=sys.stderr)
             return 1
+        kind = TOTP if args.totp else PASSWORD
         password = new_password()
         if password is None:
             return 2
-        accounts[name] = {"nombre": args.display_name or name, "hash": hash_password(password), "version": 1,
-                          "roles": roles or [*FUNCTION_ROLES, ALL]}
+        secret = new_totp_secret() if kind == TOTP else None
+        if secret and not enrol_totp(name, secret):
+            return 2
+        files[kind][name] = {"nombre": args.display_name or name, "hash": hash_password(password), "version": 1,
+                             "roles": roles or [*FUNCTION_ROLES, ALL], "totp": secret}
     elif args.action == "passwd":
         password = new_password()
         if password is None:
             return 2
-        accounts[name].update(hash=hash_password(password), version=accounts[name]["version"] + 1)
+        files[kind][name].update(hash=hash_password(password), version=files[kind][name]["version"] + 1)
+    elif args.action == "totp":
+        secret = new_totp_secret()
+        if not enrol_totp(name, secret):
+            return 2
+        files[kind][name].update(totp=secret, activar_hasta=None, version=files[kind][name]["version"] + 1)
     elif args.action == "revoke":
-        accounts[name]["version"] += 1
+        files[kind][name]["version"] += 1
     elif args.action == "roles":
-        accounts[name]["roles"] = roles
+        files[kind][name]["roles"] = roles
     elif args.action == "remove":
-        del accounts[name]
+        del files[kind][name]
     if args.action != "list":
-        save_local_accounts(accounts)
-        print(f"Saved. {'Its sessions and tokens no longer work. ' if args.action in ('passwd', 'revoke', 'remove') else ''}"
-              "No restart needed.")
-    print(f"{local_accounts_file()}:")
-    for account_name, account in sorted(accounts.items()):
-        shown = ", ".join("every table" if r == ALL else r for r in account["roles"]) or "(no roles)"
-        print(f"  {account_name}: {shown}")
-    if not accounts:
-        print("  (none: create one with  sofibot local-account add NAME --generate)")
+        save_accounts(kind, files[kind])
+        ends = args.action in ("passwd", "totp", "revoke", "remove")
+        print(f"Saved. {'Its sessions and tokens no longer work. ' if ends else ''}No restart needed.")
+    try:
+        enabled = enabled_kinds()
+    except PermissionsError as exc:
+        print(f"WARNING: {exc}", file=sys.stderr)
+        enabled = ()
+    for listed, title in ((PASSWORD, "user name and password"), (TOTP, "user name, password and TOTP code")):
+        accounts = files[listed]
+        if listed == TOTP and not accounts:
+            continue
+        off = "" if listed in enabled else "  (these cannot sign in: not in SOFIBOT_LOCAL_ACCOUNTS)"
+        print(f"{accounts_file(listed)} ({title}):{off}")
+        for account_name, account in sorted(accounts.items()):
+            shown = ", ".join("every table" if r == ALL else r for r in account["roles"]) or "(no roles)"
+            total = ("  [FULL ACCESS: every role and every Gold table, whatever the tables]"
+                     if full_access(account["roles"]) else "")
+            if account.get("activar_hasta") is not None:
+                total += f"  (pending activation until {account['activar_hasta']:%Y-%m-%d %H:%M} UTC)"
+            print(f"  {account_name}: {shown}{total}")
+        if not accounts:
+            print("  (none: create one with  sofibot local-account add NAME --generate [--totp])")
     return 0
+
+
+def enrol_totp(name: str, secret: str) -> bool:
+    """Show the TOTP secret once (QR code and text) and check one code from the app."""
+    from .identity import totp_step, totp_uri
+
+    uri = totp_uri(name, secret)
+    print("Scan this QR code with the authenticator app (Microsoft Authenticator, Google Authenticator...)"
+          f" of the person who will use {name}. Shown only now:\n")
+    import io
+
+    drawn = False
+    try:
+        import segno
+
+        # ANSI colours, black on white whatever the terminal's theme: Unicode half blocks came out
+        # inverted or with gaps in Windows terminals with a dark theme, and apps could not read them.
+        text = io.StringIO()
+        for row in segno.make(uri, error="m").matrix_iter(border=4):  # two spaces per module: square
+            text.write("".join("\x1b[40m  " if dark else "\x1b[107m  " for dark in row) + "\x1b[0m\n")
+        sys.stdout.write(text.getvalue())
+        sys.stdout.flush()
+        drawn = True
+    except ImportError:
+        pass
+    if not drawn:  # the key, typed in the app
+        print("  (cannot draw the QR code here: type the key in the app instead)")
+    grouped = " ".join(secret[i:i + 4] for i in range(0, len(secret), 4))
+    print(f"\nOr add it by hand: account {name}, key {grouped} (time-based, 6 digits, 30 seconds).\n")
+    for _ in range(3):
+        code = input("Code the app shows now (to check it works): ")
+        if totp_step(secret, code) is not None:
+            print("Code accepted.\n")
+            return True
+        print("That code does not match: check the phone's time is set automatically, and try again.")
+    print("ERROR: no valid code; nothing saved", file=sys.stderr)
+    return False
 
 
 def permissions(_args) -> int:
@@ -415,11 +484,13 @@ def main(argv=None) -> int:
     command.add_argument("roles", nargs="*", help="role names, e.g. Sofibot.Admin Ventas")
     command.set_defaults(run=users)
     command = commands.add_parser("local-account", help="manage local accounts (sign-in without Entra ID)")
-    command.add_argument("action", nargs="?", choices=["list", "add", "passwd", "revoke", "roles", "remove"], default="list")
+    command.add_argument("action", nargs="?", choices=["list", "add", "passwd", "totp", "revoke", "roles", "remove"],
+                         default="list")
     command.add_argument("name", nargs="?", default="")
     command.add_argument("roles", nargs="*", help='with "roles": the roles to set, e.g. Sofibot.Admin "*"')
     command.add_argument("--roles", dest="add_roles", nargs="+", help="with add: its roles (default: every role and table)")
     command.add_argument("--generate", action="store_true", help="make a random password and print it once")
+    command.add_argument("--totp", action="store_true", help="with add: also ask for a code from an authenticator app")
     command.add_argument("--display-name", default="", help="with add: name shown in the portal")
     command.set_defaults(run=local_account)
     commands.add_parser("permissions", help="check acceso/permisos.json (Entra ID sign-in)").set_defaults(run=permissions)

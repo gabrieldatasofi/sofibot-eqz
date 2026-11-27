@@ -1,4 +1,5 @@
-"""Local accounts (acceso/cuentas-locales.json): sign-in without Entra ID, roles, Sofibot's own tokens."""
+"""Local accounts (acceso/cuentas-locales.json and, with TOTP, cuentas-totp.json): sign-in without
+Entra ID, roles, Sofibot's own tokens."""
 import json
 import time
 
@@ -25,8 +26,10 @@ def add_account(name="sofibot.admin", roles=EVERYTHING, password=PASSWORD, versi
 
 
 @pytest.fixture(autouse=True)
-def fresh_failures():
+def fresh_failures(monkeypatch):
     auth._failures.clear()
+    auth._used_steps.clear()
+    monkeypatch.delenv("SOFIBOT_LOCAL_ACCOUNTS", raising=False)
 
 
 @pytest.fixture
@@ -263,3 +266,17 @@ def test_cli_manages_local_accounts(folders, monkeypatch, capsys):
     assert cli.main(["local-account", "remove", "sofibot.admin"]) == 0
     assert access.read_local_accounts() == {}
     assert "scrypt" not in capsys.readouterr().out
+
+
+def test_full_access_accounts_are_labelled(local_portal, capsys):
+    assert identity.full_access(EVERYTHING) and not identity.full_access(["*"])
+    assert not identity.full_access([*identity.FUNCTION_ROLES, "Ventas"])
+    add_account("tienda", roles=["Ventas"])
+    local_sign_in(local_portal)
+    users = local_portal.get("/admin/usuarios").text
+    assert users.count('class="tag total"') == 2  # sofibot.admin, and the legend; not tienda
+    assert "sofibot.admin (acceso total)" in local_portal.get("/admin").text
+    assert "tienda (acceso total)" not in local_portal.get("/admin").text
+    assert cli.main(["local-account"]) == 0
+    listing = capsys.readouterr().out
+    assert "sofibot.admin:" in listing and listing.count("FULL ACCESS") == 1

@@ -224,14 +224,18 @@ Microsoft, con todos los roles (la contraseña la entrega Datasofi aparte). Comp
 `docker compose run --rm sofibot sofibot local-account`.
 
 **Recomendado: administrador de emergencia.** Una cuenta local entra con usuario y contraseña,
-sin pasar por Microsoft, por si un día falla Entra ID:
+sin pasar por Microsoft, por si un día falla Entra ID. Con `--totp`, además pide el código de
+una aplicación de autenticación del móvil:
 
 ```bash
-docker compose run --rm sofibot sofibot local-account add sofibot.admin --generate
+docker compose run --rm sofibot sofibot local-account add sofibot.admin --totp --generate
 ```
 
 Muestra la contraseña **una sola vez**: guardadla en el gestor de contraseñas de la empresa.
-Desde ese momento, la página de entrada ofrece también usuario y contraseña. Detalle y
+Después muestra un código QR: escaneadlo con la aplicación del móvil y escribid el código que
+aparece. Desde ese momento, la página de entrada ofrece también usuario y contraseña.
+Sin `--roles`, es una cuenta de **acceso total**: todos los roles y todas las tablas Gold, sin
+esperar a configurar Permisos por tabla ([09 · Cuentas de acceso total](09-inicio-sesion-entra.md#cuentas-de-acceso-total)). Detalle y
 precauciones: [09 · Cuentas locales](09-inicio-sesion-entra.md#cuentas-locales-sin-entra-id).
 
 ---
